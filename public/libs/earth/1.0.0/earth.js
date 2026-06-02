@@ -33,6 +33,14 @@
 
     var view = µ.view();
     var log = µ.log();
+    var currentBlur = 0;
+
+    /**
+     * Applies the current blur value to a canvas 2D context before drawing.
+     */
+    function setCanvasBlur(ctx) {
+        ctx.filter = currentBlur > 0 ? "blur(" + currentBlur + "px)" : "none";
+    }
 
     /**
      * An object to display various types of messages to the user.
@@ -164,20 +172,6 @@
         }, MOVE_END_WAIT);  // wait for a bit to decide if user has stopped moving the globe
 
         d3.select("#display").call(zoom);
-        d3.select("#show-location").on("click", function() {
-            if (navigator.geolocation) {
-                report.status("Finding current position...");
-                navigator.geolocation.getCurrentPosition(function(pos) {
-                    report.status("");
-                    var coord = [pos.coords.longitude, pos.coords.latitude], rotate = globe.locate(coord);
-                    if (rotate) {
-                        globe.projection.rotate(rotate);
-                        configuration.save({orientation: globe.orientation()});  // triggers reorientation
-                    }
-                    dispatch.trigger("click", globe.projection(coord), coord);
-                }, log.error);
-            }
-        });
 
         function reorient() {
             var options = arguments[3] || {};
@@ -261,20 +255,6 @@
         }).ensure(function() {
             downloadsInProgress--;
         });
-    }
-
-    /**
-     * Modifies the configuration to navigate to the chronologically next or previous data layer.
-     */
-    function navigate(step) {
-        if (downloadsInProgress > 0) {
-            log.debug("Download in progress--ignoring nav request.");
-            return;
-        }
-        var next = gridAgent.value().primaryGrid.navigate(step);
-        if (next) {
-            configuration.save(µ.dateToConfig(next));
-        }
     }
 
     function buildRenderer(mesh, globe) {
@@ -604,8 +584,12 @@
             // Fade existing particle trails.
             var prev = g.globalCompositeOperation;
             g.globalCompositeOperation = "destination-in";
+            g.filter = "none";
             g.fillRect(bounds.x, bounds.y, bounds.width, bounds.height);
             g.globalCompositeOperation = prev;
+
+            // Apply canvas-level blur for smoother rendering.
+            setCanvasBlur(g);
 
             // Draw new particle trails.
             buckets.forEach(function(bucket, i) {
@@ -621,6 +605,8 @@
                     g.stroke();
                 }
             });
+
+            g.filter = "none";
         }
 
         (function frame() {
@@ -661,9 +647,10 @@
 
         var ctx = d3.select("#overlay").node().getContext("2d"), grid = (gridAgent.value() || {}).overlayGrid;
 
-        µ.clearCanvas(d3.select("#overlay").node());
-        µ.clearCanvas(d3.select("#scale").node());
-        if (overlayType) {
+    µ.clearCanvas(d3.select("#overlay").node());
+    var scaleCanvas = d3.select("#scale").node();
+    if (scaleCanvas) µ.clearCanvas(scaleCanvas);
+    if (overlayType) {
             if (overlayType !== "off") {
                 ctx.putImageData(field.overlay, 0, 0);
             }
@@ -672,23 +659,25 @@
 
         if (grid) {
             // Draw color bar for reference.
-            var colorBar = d3.select("#scale"), scale = grid.scale, bounds = scale.bounds;
-            var c = colorBar.node(), g = c.getContext("2d"), n = c.width - 1;
-            for (var i = 0; i <= n; i++) {
-                var rgb = scale.gradient(µ.spread(i / n, bounds[0], bounds[1]), 1);
-                g.fillStyle = "rgb(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + ")";
-                g.fillRect(i, 0, 1, c.height);
+            var colorBar = d3.select("#scale"), c = colorBar.node();
+            if (c) {
+                var scale = grid.scale, bounds = scale.bounds;
+                var g = c.getContext("2d"), n = c.width - 1;
+                for (var i = 0; i <= n; i++) {
+                    var rgb = scale.gradient(µ.spread(i / n, bounds[0], bounds[1]), 1);
+                    g.fillStyle = "rgb(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + ")";
+                    g.fillRect(i, 0, 1, c.height);
+                }
+                // Show tooltip on hover.
+                colorBar.on("mousemove", function() {
+                    var x = d3.mouse(this)[0];
+                    var pct = µ.clamp((Math.round(x) - 2) / (n - 2), 0, 1);
+                    var value = µ.spread(pct, bounds[0], bounds[1]);
+                    var elementId = grid.type === "wind" ? "#location-wind-units" : "#location-value-units";
+                    var units = createUnitToggle(elementId, grid).value();
+                    colorBar.attr("title", µ.formatScalar(value, units) + " " + units.label);
+                });
             }
-
-            // Show tooltip on hover.
-            colorBar.on("mousemove", function() {
-                var x = d3.mouse(this)[0];
-                var pct = µ.clamp((Math.round(x) - 2) / (n - 2), 0, 1);
-                var value = µ.spread(pct, bounds[0], bounds[1]);
-                var elementId = grid.type === "wind" ? "#location-wind-units" : "#location-value-units";
-                var units = createUnitToggle(elementId, grid).value();
-                colorBar.attr("title", µ.formatScalar(value, units) + " " + units.label);
-            });
         }
     }
 
@@ -713,6 +702,8 @@
      * Display the grid's validity date in the menu. Allow toggling between local and UTC time.
      */
     function showDate(grids) {
+        var el = d3.select("#data-date").node();
+        if (!el) return;
         var date = new Date(validityDate(grids)), isLocal = d3.select("#data-date").classed("local");
         var formatted = isLocal ? µ.toLocalISO(date) : µ.toUTCISO(date);
         d3.select("#data-date").text(formatted + " " + (isLocal ? "Local" : "UTC"));
@@ -724,6 +715,8 @@
      */
     function showGridDetails(grids) {
         showDate(grids);
+        var layerEl = d3.select("#data-layer").node();
+        if (!layerEl) return;
         var description = "", center = "";
         if (grids) {
             var langCode = d3.select("body").attr("data-lang") || "en";
@@ -886,11 +879,6 @@
         });
 
         d3.selectAll(".fill-screen").attr("width", view.width).attr("height", view.height);
-        // Adjust size of the scale canvas to fill the width of the menu to the right of the label.
-        var label = d3.select("#scale-label").node();
-        d3.select("#scale")
-            .attr("width", (d3.select("#menu").node().offsetWidth - label.offsetWidth) * 0.97)
-            .attr("height", label.offsetHeight / 2);
 
         d3.select("#show-menu").on("click", function() {
             if (µ.isEmbeddedInIFrame()) {
@@ -961,10 +949,12 @@
         gridAgent.on("update", function(grids) {
             showGridDetails(grids);
         });
-        d3.select("#toggle-zone").on("click", function() {
-            d3.select("#data-date").classed("local", !d3.select("#data-date").classed("local"));
-            showDate(gridAgent.cancel.requested ? null : gridAgent.value());
-        });
+        if (d3.select("#toggle-zone").node()) {
+            d3.select("#toggle-zone").on("click", function() {
+                d3.select("#data-date").classed("local", !d3.select("#data-date").classed("local"));
+                showDate(gridAgent.cancel.requested ? null : gridAgent.value());
+            });
+        }
 
         function startRendering() {
             rendererAgent.submit(buildRenderer, meshAgent.value(), globeAgent.value());
@@ -1013,20 +1003,6 @@
         configuration.on("change:param", function(context, mode) {
             d3.selectAll(".ocean-mode").classed("invisible", mode !== "ocean");
             d3.selectAll(".wind-mode").classed("invisible", mode !== "wind");
-            switch (mode) {
-                case "wind":
-                    d3.select("#nav-backward-more").attr("title", "-1 Day");
-                    d3.select("#nav-backward").attr("title", "-3 Hours");
-                    d3.select("#nav-forward").attr("title", "+3 Hours");
-                    d3.select("#nav-forward-more").attr("title", "+1 Day");
-                    break;
-                case "ocean":
-                    d3.select("#nav-backward-more").attr("title", "-1 Month");
-                    d3.select("#nav-backward").attr("title", "-5 Days");
-                    d3.select("#nav-forward").attr("title", "+5 Days");
-                    d3.select("#nav-forward-more").attr("title", "+1 Month");
-                    break;
-            }
         });
 
         // Add handlers for mode buttons.
@@ -1062,45 +1038,487 @@
             d3.select("#ocean-mode-enable").classed("highlighted", param === "ocean");
         });
 
-        // Add logic to disable buttons that are incompatible with each other.
-        configuration.on("change:overlayType", function(x, ot) {
-            d3.select("#surface-level").classed("disabled", ot === "air_density" || ot === "wind_power_density");
-        });
-        configuration.on("change:surface", function(x, s) {
-            d3.select("#overlay-air_density").classed("disabled", s === "surface");
-            d3.select("#overlay-wind_power_density").classed("disabled", s === "surface");
+        // Add handler for map visibility toggle.
+        d3.select("#toggle-map").on("click", function() {
+            var hidden = d3.select("#map").classed("hidden");
+            d3.selectAll("#map, #foreground, #overlay").classed("hidden", !hidden);
+            d3.select("#toggle-map").classed("highlighted", !hidden);
         });
 
-        // Add event handlers for the time navigation buttons.
-        d3.select("#nav-backward-more").on("click", navigate.bind(null, -10));
-        d3.select("#nav-forward-more" ).on("click", navigate.bind(null, +10));
-        d3.select("#nav-backward"     ).on("click", navigate.bind(null, -1));
-        d3.select("#nav-forward"      ).on("click", navigate.bind(null, +1));
-        d3.select("#nav-now").on("click", function() { configuration.save({date: "current", hour: ""}); });
+        // Image adjustment (brightness, contrast & blur) sliders
+        var displayEl = d3.select("#display");
 
-        d3.select("#option-show-grid").on("click", function() {
-            configuration.save({showGridPoints: !configuration.get("showGridPoints")});
-        });
-        configuration.on("change:showGridPoints", function(x, showGridPoints) {
-            d3.select("#option-show-grid").classed("highlighted", showGridPoints);
+        function updateImageFilters() {
+            var brightness = d3.select("#brightness-slider").property("value");
+            var contrast = d3.select("#contrast-slider").property("value");
+            var blur = d3.select("#blur-slider").property("value");
+            currentBlur = +blur;
+            displayEl.style("filter", "grayscale(1) brightness(" + brightness + "%) contrast(" + contrast + "%)");
+            var blurFilter = blur > 0 ? "blur(" + blur + "px)" : null;
+            d3.select("#map").style("filter", blurFilter);
+            d3.select("#animation").style("filter", blurFilter);
+            d3.select("#overlay").style("filter", blurFilter);
+            d3.select("#foreground").style("filter", blurFilter);
+        }
+
+        d3.select("#brightness-slider").on("input", updateImageFilters);
+        d3.select("#contrast-slider").on("input", updateImageFilters);
+        d3.select("#blur-slider").on("input", updateImageFilters);
+
+        d3.select("#reset-image").on("click", function() {
+            d3.select("#brightness-slider").property("value", 100);
+            d3.select("#contrast-slider").property("value", 100);
+            d3.select("#blur-slider").property("value", 0);
+            updateImageFilters();
         });
 
-        // Add handlers for all wind level buttons.
-        d3.selectAll(".surface").each(function() {
-            var id = this.id, parts = id.split("-");
-            bindButtonToConfiguration("#" + id, {param: "wind", surface: parts[0], level: parts[1]});
+        // Initialize filter
+        updateImageFilters();
+
+        // About modal — build content and bind handlers
+        var aboutModal = d3.select("#about-modal");
+        var aboutBody = d3.select("#about-modal-body");
+
+        aboutBody.html(
+            '<h2>▸ VENTUS — FORK</h2>' +
+            '<hr class="about-sep"/>' +
+            '<div class="about-section">' +
+            '  <span class="about-label">ORIGIN</span>' +
+            '  <span>This project is a fork of <strong class="about-highlight">earth</strong>, ' +
+            '  an animated visualization of global weather conditions originally created by ' +
+            '  <strong>Cameron Beccario</strong>.' +
+            '</div>' +
+            '<div class="about-section">' +
+            '  <span class="about-label">ORIGINAL</span>' +
+            '  <a href="https://earth.nullschool.net" target="_blank">earth.nullschool.net</a>' +
+            '</div>' +
+            '<div class="about-section">' +
+            '  <span class="about-label">SOURCE</span>' +
+            '  <a href="https://github.com/cambecc/earth" target="_blank">github.com/cambecc/earth</a>' +
+            '</div>' +
+            '<div class="about-section">' +
+            '  <span class="about-label">LICENSE</span>' +
+            '  <span>MIT — see original repository for details</span>' +
+            '</div>' +
+            '<hr class="about-sep"/>' +
+            '<div class="about-section">' +
+            '  <span class="about-label">FORK BY</span>' +
+            '  <span><strong>Santiago Crespo</strong> ' +
+            '  (<a href="https://www.instagram.com/santicopi/" target="_blank">@santicopi</a>)</span>' +
+            '</div>' +
+            '<div class="about-section">' +
+            '  <span class="about-label">BUILT W/</span>' +
+            '  <span><strong><a href="https://freebuff.io" target="_blank">Freebuff</a></strong> — AI-assisted coding tool</span>' +
+            '</div>'
+        );
+
+        d3.select("#show-about").on("click", function() {
+            // Hide the menu first
+            d3.select("#menu").classed("invisible", true);
+            // Show the about modal
+            aboutModal.classed("invisible", false);
         });
+
+        function closeAboutModal() {
+            aboutModal.classed("invisible", true);
+        }
+
+        d3.select("#about-modal-close").on("click", closeAboutModal);
+
+        // Close modal when clicking on the backdrop (outside content area)
+        aboutModal.on("click", function() {
+            closeAboutModal();
+        });
+        d3.select("#about-modal-content").on("click", function() {
+            d3.event.stopPropagation();
+        });
+
+        // Screenshot capture function
+        function captureScreenshot() {
+            var details = d3.select("#details");
+            var wasInvisible = details.classed("invisible");
+            // Hide recording timer if visible
+            var recTimer = d3.select("#recording-timer");
+            var wasTimerVisible = !recTimer.classed("invisible");
+            if (wasTimerVisible) {
+                recTimer.classed("invisible", true);
+            }
+            // Hide the control panel and details temporarily
+            if (!wasInvisible) {
+                details.classed("invisible", true);
+            }
+            // Small delay to let DOM update before capture
+            setTimeout(function() {
+                var retinaScale = window.devicePixelRatio || 1;
+                html2canvas(document.body, {
+                    scale: retinaScale,
+                    useCORS: true,
+                    backgroundColor: "#000000",
+                    logging: false,
+                    width: window.innerWidth,
+                    height: window.innerHeight,
+                    x: window.scrollX,
+                    y: window.scrollY,
+                    scrollX: -window.scrollX,
+                    scrollY: -window.scrollY
+                }).then(function(canvas) {
+                    // Restore timer and panel visibility
+                    if (wasTimerVisible) {
+                        recTimer.classed("invisible", false);
+                    }
+                    if (!wasInvisible) {
+                        details.classed("invisible", false);
+                    }
+                    // Apply grayscale, brightness & contrast by processing pixel data directly
+                    // Pixel-level manipulation is more reliable than ctx.filter across browsers
+                    var brightness = +d3.select("#brightness-slider").property("value");
+                    var contrast = +d3.select("#contrast-slider").property("value");
+                    var ctx = canvas.getContext("2d");
+                    var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    var data = imageData.data;
+                    var bFactor = brightness / 100;
+                    var cFactor = contrast / 100;
+                    var cOffset = -128 * cFactor + 128;
+                    for (var i = 0; i < data.length; i += 4) {
+                        // Grayscale using luminance weights (ITU-R BT.709)
+                        var gray = 0.2126 * data[i] + 0.7152 * data[i+1] + 0.0722 * data[i+2];
+                        // Apply brightness & contrast
+                        var val = gray * bFactor * cFactor + cOffset;
+                        val = Math.min(255, Math.max(0, val));
+                        data[i] = data[i+1] = data[i+2] = val;
+                    }
+                    ctx.putImageData(imageData, 0, 0);
+                    // Trigger download
+                    var link = document.createElement("a");
+                    link.download = "earth-screenshot-" + new Date().toISOString().slice(0, 19).replace(/:/g, "-") + ".png";
+                    link.href = canvas.toDataURL("image/png");
+                    link.click();
+
+                    // Flash confirmation after capture completes
+                    var flashEl = d3.select("#capture-flash");
+                    flashEl.classed("active", true);
+                    flashEl.classed("fade", false);
+                    setTimeout(function() {
+                        flashEl.classed("fade", true);
+                        flashEl.classed("active", false);
+                        // Clean up after fade transition completes
+                        setTimeout(function() {
+                            flashEl.classed("fade", false);
+                        }, 310);
+                    }, 120);
+                }).catch(function(err) {
+                    // Restore panel even if capture fails
+                    if (!wasInvisible) {
+                        details.classed("invisible", false);
+                    }
+                    report.error("Screenshot failed: " + err.message);
+                });
+            }, 100);
+        }
+
+        d3.select("#capture-screenshot").on("click", captureScreenshot);
+
+        // Screen recording state & function — uses canvas.captureStream() instead of getDisplayMedia()
+        // Benefits: no permission dialog, no mouse cursor captured, full control over what's recorded
+        var recorder = null;
+        var recordingChunks = [];
+        var recButton = d3.select("#record-screen");
+        var recordingTimer = null;
+        var renderInterval = null;
+        var recordingStarting = false;  // guard against double-click while SVGs load
+
+        // FPS selector – highlight clicked button and de-highlight others
+        d3.selectAll(".rec-fps").on("click", function() {
+            d3.selectAll(".rec-fps").classed("highlighted", false);
+            d3.select(this).classed("highlighted", true);
+        });
+
+        function getSelectedFps() {
+            return +d3.select(".rec-fps.highlighted").attr("data-fps") || 30;
+        }
+
+        // Bitrate quality selector – highlight clicked button
+        d3.selectAll(".rec-quality").on("click", function() {
+            d3.selectAll(".rec-quality").classed("highlighted", false);
+            d3.select(this).classed("highlighted", true);
+        });
+
+        function getSelectedBitrate() {
+            // data-bitrate is in kbps, convert to bps for MediaRecorder
+            return (+d3.select(".rec-quality.highlighted").attr("data-bitrate") || 2500) * 1000;
+        }
+
+        function parseDuration(str) {
+            // Accept MM:SS or just seconds as number
+            var trimmed = str.trim();
+            var match = trimmed.match(/^(\d+):(\d{1,2})$/);
+            if (match) {
+                var mins = +match[1], secs = +match[2];
+                return Math.max(1, Math.min(mins * 60 + secs, 3600)); // clamp 1s – 3600s (60min)
+            }
+            var num = +trimmed;
+            if (!isNaN(num) && num > 0) {
+                return Math.min(num, 3600);
+            }
+            return 30; // default 30s
+        }
+
+        function getBestMimeType() {
+            var types = [
+                "video/mp4;codecs=avc1.42E01E",
+                "video/mp4;codecs=avc1.4D401E",
+                "video/webm;codecs=vp9",
+                "video/webm;codecs=vp8",
+                "video/webm"
+            ];
+            for (var j = 0; j < types.length; j++) {
+                if (MediaRecorder.isTypeSupported(types[j])) {
+                    return types[j];
+                }
+            }
+            return "video/webm";
+        }
+
+        function extensionForMime(mime) {
+            if (mime.indexOf("mp4") >= 0) return ".mp4";
+            if (mime.indexOf("webm") >= 0) return ".webm";
+            return ".webm";
+        }
+
+        /**
+         * Serialize an SVG element to an Image that can be drawn on canvas.
+         */
+        function svgToImage(svgEl, w, h) {
+            var d = when.defer();
+            if (!svgEl) { d.resolve(null); return d.promise; }
+            try {
+                var clone = svgEl.cloneNode(true);
+                clone.removeAttribute("style");
+                clone.setAttribute("width", w);
+                clone.setAttribute("height", h);
+                var svgData = new XMLSerializer().serializeToString(clone);
+                var svgBlob = new Blob([svgData], {type: "image/svg+xml;charset=utf-8"});
+                var url = URL.createObjectURL(svgBlob);
+                var img = new Image();
+                img.onload = function() { URL.revokeObjectURL(url); d.resolve(img); };
+                img.onerror = function() { URL.revokeObjectURL(url); d.resolve(null); };
+                img.src = url;
+            } catch(e) { d.resolve(null); }
+            return d.promise;
+        }
+
+        function stopRecording() {
+            if (recorder && recorder.state === "recording") {
+                recorder.stop();
+            }
+            if (renderInterval) {
+                clearInterval(renderInterval);
+                renderInterval = null;
+            }
+            if (recordingTimer) {
+                clearTimeout(recordingTimer);
+                recordingTimer = null;
+            }
+        }
+
+        function toggleRecording() {
+            if (recorder && recorder.state === "recording") {
+                // Stop recording (user-initiated)
+                recordingStarting = false;
+                stopRecording();
+                return;
+            }
+            // Guard against double-click while SVGs are still serializing
+            if (recordingStarting) return;
+            recordingStarting = true;
+
+            // Parse duration from input
+            var durInput = d3.select("#record-duration").property("value");
+            var durationSec = parseDuration(durInput);
+            // Normalize display
+            var mins = Math.floor(durationSec / 60);
+            var secs = durationSec % 60;
+            d3.select("#record-duration").property("value",
+                (mins < 10 ? "0" : "") + mins + ":" + (secs < 10 ? "0" : "") + secs);
+
+            // Hide the control panel
+            var details = d3.select("#details");
+            var wasInvisible = details.classed("invisible");
+            if (!wasInvisible) {
+                details.classed("invisible", true);
+            }
+
+            var w = view.width, h = view.height;
+
+            // Create offscreen canvas for compositing all layers
+            var offCanvas = document.createElement("canvas");
+            offCanvas.width = w;
+            offCanvas.height = h;
+            var offCtx = offCanvas.getContext("2d", { willReadFrequently: true });
+
+            // Get canvas elements
+            var animCanvas = d3.select("#animation").node();
+            var overlayCanvas = d3.select("#overlay").node();
+
+            // Serialize static SVG layers to Images (async)
+            when.all([
+                svgToImage(d3.select("#map").node(), w, h),
+                svgToImage(d3.select("#foreground").node(), w, h)
+            ]).then(function(images) {
+                if (wasInvisible) {
+                    details.classed("invisible", true);
+                }
+
+                var mapImg = images[0], fgImg = images[1];
+                var mapHidden = d3.select("#map").classed("hidden");
+                var fgHidden = d3.select("#foreground").classed("hidden");
+                var overlayHidden = d3.select("#overlay").classed("hidden");
+
+                // Read current filter values once at start
+                var brightness = +d3.select("#brightness-slider").property("value");
+                var contrast = +d3.select("#contrast-slider").property("value");
+                var bFactor = brightness / 100;
+                var cFactor = contrast / 100;
+                var cOffset = -128 * cFactor + 128;
+
+                var mimeType = getBestMimeType();
+                var fileExt = extensionForMime(mimeType);
+
+                var recFps = getSelectedFps();
+                // Create stream from the offscreen canvas
+                var stream = offCanvas.captureStream(recFps);
+                recordingChunks = [];
+                var recBitrate = getSelectedBitrate();
+                recorder = new MediaRecorder(stream, { mimeType: mimeType, bitsPerSecond: recBitrate });
+
+                recordingStarting = false;
+
+                recorder.ondataavailable = function(e) {
+                    if (e.data.size > 0) {
+                        recordingChunks.push(e.data);
+                    }
+                };
+
+                recorder.onstop = function() {
+                    recordingStarting = false;
+                    if (renderInterval) {
+                        clearInterval(renderInterval);
+                        renderInterval = null;
+                    }
+                    if (recordingTimer) {
+                        clearTimeout(recordingTimer);
+                        recordingTimer = null;
+                    }
+                    // Hide timer and restore panel visibility
+                    d3.select("#recording-timer").classed("invisible", true);
+                    if (!wasInvisible) {
+                        details.classed("invisible", false);
+                    }
+                    recButton.text("[REC]");
+                    recButton.classed("recording-active", false);
+                    recButton.classed("highlighted", false);
+
+                    // Download the recording
+                    var blob = new Blob(recordingChunks, { type: mimeType });
+                    var url = URL.createObjectURL(blob);
+                    var link = document.createElement("a");
+                    link.download = "earth-recording-" + new Date().toISOString().slice(0, 19).replace(/:/g, "-") + fileExt;
+                    link.href = url;
+                    link.click();
+                    setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+                    recorder = null;
+                };
+
+                recorder.onerror = function() {
+                    recordingStarting = false;
+                    if (renderInterval) {
+                        clearInterval(renderInterval);
+                        renderInterval = null;
+                    }
+                    if (recordingTimer) {
+                        clearTimeout(recordingTimer);
+                        recordingTimer = null;
+                    }
+                    d3.select("#recording-timer").classed("invisible", true);
+                    if (!wasInvisible) {
+                        details.classed("invisible", false);
+                    }
+                    recButton.text("[REC]");
+                    recButton.classed("recording-active", false);
+                    recButton.classed("highlighted", false);
+                    recorder = null;
+                };
+
+                // Render loop: composite all layers onto offscreen canvas at selected fps (recFps already set above)
+                // Grayscale + brightness + contrast are ALWAYS applied via pixel manipulation
+                // because CSS filters on #display don't apply to the offscreen canvas.
+                var timerEl = d3.select("#recording-timer");
+                var recStartTime = Date.now();
+                var totalMs = durationSec * 1000;
+
+                renderInterval = setInterval(function() {
+                    // Update countdown timer (DOM only, not captured in video)
+                    var elapsed = Date.now() - recStartTime;
+                    var remaining = Math.max(0, Math.round((totalMs - elapsed) / 1000));
+                    var m = Math.floor(remaining / 60);
+                    var s = remaining % 60;
+                    timerEl.text("REC " + (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s);
+
+                    // Fill black background
+                    offCtx.fillStyle = "#000000";
+                    offCtx.fillRect(0, 0, w, h);
+
+                    // Layer 1: map SVG (coastlines, graticule)
+                    if (mapImg && !d3.select("#map").classed("hidden")) {
+                        offCtx.drawImage(mapImg, 0, 0);
+                    }
+
+                    // Layer 2: color overlay canvas
+                    if (!d3.select("#overlay").classed("hidden")) {
+                        offCtx.drawImage(overlayCanvas, 0, 0);
+                    }
+
+                    // Layer 3: wind animation canvas (always visible)
+                    offCtx.drawImage(animCanvas, 0, 0);
+
+                    // Layer 4: foreground SVG (location marks)
+                    if (fgImg && !d3.select("#foreground").classed("hidden")) {
+                        offCtx.drawImage(fgImg, 0, 0);
+                    }
+
+                    // Apply grayscale + brightness + contrast via pixel manipulation
+                    // Grayscale MUST always be applied (CSS grayscale(1) on #display doesn't affect offscreen canvas)
+                    var imageData = offCtx.getImageData(0, 0, w, h);
+                    var data = imageData.data;
+                    for (var i = 0; i < data.length; i += 4) {
+                        var gray = 0.2126 * data[i] + 0.7152 * data[i+1] + 0.0722 * data[i+2];
+                        var val = gray * bFactor * cFactor + cOffset;
+                        val = Math.min(255, Math.max(0, val));
+                        data[i] = data[i+1] = data[i+2] = val;
+                    }
+                    offCtx.putImageData(imageData, 0, 0);
+                }, Math.round(1000 / recFps)); // ~fps
+
+                d3.select("#recording-timer").classed("invisible", false);
+
+                recorder.start(1000);
+
+                recButton.text("[REC*]");
+                recButton.classed("recording-active", true);
+
+                // Auto-stop after duration
+                recordingTimer = setTimeout(function() {
+                    if (recorder && recorder.state === "recording") {
+                        recorder.stop();
+                    }
+                }, durationSec * 1000);
+            });
+        }
+
+        recButton.on("click", toggleRecording);
 
         // Add handlers for ocean animation types.
         bindButtonToConfiguration("#animate-currents", {param: "ocean", surface: "surface", level: "currents"});
-
-        // Add handlers for all overlay buttons.
-        products.overlayTypes.forEach(function(type) {
-            bindButtonToConfiguration("#overlay-" + type, {overlayType: type});
-        });
-        bindButtonToConfiguration("#overlay-wind", {param: "wind", overlayType: "default"});
-        bindButtonToConfiguration("#overlay-ocean-off", {overlayType: "off"});
-        bindButtonToConfiguration("#overlay-currents", {overlayType: "default"});
 
         // Add handlers for all projection buttons.
         globes.keys().forEach(function(p) {
