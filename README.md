@@ -1,122 +1,163 @@
-earth
-=====
+ventus
+======
 
-**NOTE: the location of `dev-server.js` has changed from `{repository}/server/` to `{repository}/`**
+**Ventus** es un fork de [earth](https://github.com/cambecc/earth), el visualizador global de condiciones climáticas con
+mapa animado de viento originalmente creado por [Cameron Beccario](https://github.com/cambecc) y disponible en
+[earth.nullschool.net](https://earth.nullschool.net).
 
-"earth" is a project to visualize global weather conditions.
+Ventus conserva la potencia del motor de visualización meteorológica original y agrega una interfaz de control con
+estética terminal retro, controles de imagen en tiempo real, captura de pantalla y grabación de video.
 
-A customized instance of "earth" is available at http://earth.nullschool.net.
+🛠 Modificaciones respecto al original
+--------------------------------------
 
-"earth" is a personal project I've used to learn javascript and browser programming, and is based on the earlier
-[Tokyo Wind Map](https://github.com/cambecc/air) project.  Feedback and contributions are welcome! ...especially
-those that clarify accepted best practices.
+- **Interfaz terminal retro** — Panel de control con estética CRT (scanlines, vignette, fuente monospace, cursor
+  parpadeante) que reemplaza el menú original
+- **Blanco y negro** — Visualización completa en escala de grises con filtro CSS y manipulación de píxeles vía JS
+- **Brillo / Contraste / Blur** — Sliders en tiempo real para ajustar la imagen
+- **Toggle de mapa** — Botón para ocultar/mostrar el mapa base
+- **Captura de pantalla (SCRSHT)** — Con html2canvas, procesamiento Retina, manipulación de píxeles (grayscale +
+  brightness + contrast) y flash verde de confirmación
+- **Grabación de pantalla (REC)** — Con `canvas.captureStream()`, sin permisos ni cursor ni panel en el video.
+  Exportación a MP4 (prioritario) o WebM, duración configurable (MM:SS), selector FPS (24/30/60/120) y calidad de
+  bitrate (LOW/MID/HIGH)
+- **Timer de grabación** — Cuenta regresiva visible en pantalla (no se graba en el video)
+- **Iconos en escala de grises** — Favicon y touch icons convertidos a B/N con Python Pillow
+- **Modal ABOUT** — Información del fork con créditos, enlaces y atribuciones
+- **Scripts de automatización** — Actualización de datos GFS y servidor con cache-busting automático
 
-building and launching
+🚀 Cómo levantar el proyecto
+----------------------------
+
+### Modo más simple (recomendado)
+
+```bash
+cd /ruta/al/proyecto
+./start.sh
+```
+
+Inicia el servidor con cache-busting automático y abre el navegador. Si el servidor ya está corriendo,
+solamente abre la pestaña. También se puede hacer doble click en `start.command` (macOS).
+
+### Modo recomendado (cache-busting automático)
+
+```bash
+./serve.sh
+# Abrir http://localhost:8080
+```
+
+### Opción simple (sin cache-busting)
+
+```bash
+cd public
+python3 -m http.server 8080
+# Luego abrir http://localhost:8080
+```
+
+**⚠️ No usar `node dev-server.js`** — Express 3.x es incompatible con Node.js v24.
+
+### Requisitos
+
+- Python 3 (para el servidor HTTP)
+- Navegador moderno (Chrome, Firefox, Safari, Edge)
+
+📦 Estructura del proyecto
+--------------------------
+
+```
+├── public/                          # Raíz del sitio web
+│   ├── index.html                   # Página principal (contiene el menú)
+│   ├── styles/styles.css            # Estilos del sitio
+│   ├── libs/earth/1.0.0/
+│   │   ├── earth.js                 # Lógica principal
+│   │   ├── micro.js                 # Utilidades (µ namespace)
+│   │   ├── globes.js                # Modelos de proyecciones del globo
+│   │   └── products.js              # Definiciones de capas de datos
+│   ├── data/                        # Datos geográficos y meteorológicos
+│   └── about.html                   # Página "about"
+├── scripts/
+│   ├── update-gfs.sh                # Actualizar datos GFS
+│   ├── setup-cron.sh                # Cron job para actualización automática
+│   └── logs/                        # Logs del cron
+├── start.sh                         # Inicia servidor o abre navegador
+├── start.command                    # Versión Finder (doble click)
+├── serve.sh                         # Servidor con cache-busting automático
+├── HANDOVER.md                      # Documentación detallada del proyecto
+└── README.md                        # Este archivo
+```
+
+🌐 Datos meteorológicos
+-----------------------
+
+Los datos provienen del [Global Forecast System](http://en.wikipedia.org/wiki/Global_Forecast_System) (GFS),
+operado por el US National Weather Service. Se generan 4 veces al día (00, 06, 12, 18 UTC).
+
+### Actualizar datos
+
+```bash
+./scripts/update-gfs.sh          # Descargar datos de viento más recientes
+./scripts/update-gfs.sh --check  # Verificar prerequisitos sin descargar
+```
+
+### Instalar actualización automática (cada 6 horas)
+
+```bash
+./scripts/setup-cron.sh install  # Instalar cron job
+./scripts/setup-cron.sh status   # Ver estado
+./scripts/setup-cron.sh logs     # Ver logs
+```
+
+### Requisitos para actualización de datos
+
+- Java OpenJDK
+- Maven
+- [grib2json](https://github.com/cambecc/grib2json) (compilado en `/tmp/grib2json-0.8.0-SNAPSHOT/`)
+
+🎮 Controles del panel
 ----------------------
 
-After installing node.js and npm, clone "earth" and install dependencies:
+```
+┌──────────────────────────────────────────────┐
+│ ● CONTROL v2.4                          ▌    │
+├──────────────────────────────────────────────┤
+│ MODE    [AIR] [OCN]                          │
+│ ANIM    [CURR]                               │
+│ PROJ    A AE CE E O S WB W3                  │
+│ ----------------------------------------     │
+│ VIEW    [MAP] [RST]                          │
+│ BRIGHT  [===========●===========]            │
+│ CNTRST  [===========●===========]            │
+│ BLUR    [===========●===========]            │
+│ CAPTURE [SCRSHT]                             │
+│ RECORD  [REC]  00:10                         │
+│          [24][30][60][120] [LOW][MID][HIGH]  │
+│ ABOUT   [ABOUT]                              │
+│ ----------------------------------------     │
+│ ■ ONLINE — ▌                                 │
+└──────────────────────────────────────────────┘
+```
 
-    git clone https://github.com/cambecc/earth
-    cd earth
-    npm install
+📝 Notas técnicas
+-----------------
 
-Next, launch the development web server:
+- El proyecto usa **D3.js v3** (API legacy), **Backbone.js**, **Underscore.js** y **TopoJSON**
+- La interpolación de campos de viento se realiza en el navegador con interpolación bilineal
+- Cada proyección distorsiona el mapa de forma diferente; se calcula la distorsión punto a punto para
+  que las partículas de viento se rendericen correctamente
+- Los iconos se convirtieron a escala de grises con Python Pillow usando pesos BT.709
+- Para evitar problemas de caché del navegador, todos los JS/CSS tienen cache-busters `?v=N`
 
-    node dev-server.js 8080
-
-Finally, point your browser to:
-
-    http://localhost:8080
-
-The server acts as a stand-in for static S3 bucket hosting and so contains almost no server-side logic. It
-serves all files located in the `earth/public` directory. See `public/index.html` and `public/libs/earth/*.js`
-for the main entry points. Data files are located in the `public/data` directory, and there is one sample
-weather layer located at `data/weather/current`.
-
-*For Ubuntu, Mint, and elementary OS, use `nodejs` instead of `node` instead due to a [naming conflict](https://github.com/joyent/node/wiki/Installing-Node.js-via-package-manager#ubuntu-mint-elementary-os).
-
-getting map data
-----------------
-
-Map data is provided by [Natural Earth](http://www.naturalearthdata.com) but must be converted to
-[TopoJSON](https://github.com/mbostock/topojson/wiki) format. We make use of a couple different map scales: a
-simplified, larger scale for animation and a more detailed, smaller scale for static display. After installing
-[GDAL](http://www.gdal.org/) and TopoJSON (see [here](http://bost.ocks.org/mike/map/#installing-tools)), the
-following commands build these files:
-
-    curl "http://www.nacis.org/naturalearth/50m/physical/ne_50m_coastline.zip" -o ne_50m_coastline.zip
-    curl "http://www.nacis.org/naturalearth/50m/physical/ne_50m_lakes.zip" -o ne_50m_lakes.zip
-    curl "http://www.nacis.org/naturalearth/110m/physical/ne_110m_coastline.zip" -o ne_110m_coastline.zip
-    curl "http://www.nacis.org/naturalearth/110m/physical/ne_110m_lakes.zip" -o ne_110m_lakes.zip
-    unzip -o ne_\*.zip
-    ogr2ogr -f GeoJSON coastline_50m.json ne_50m_coastline.shp
-    ogr2ogr -f GeoJSON coastline_110m.json ne_110m_coastline.shp
-    ogr2ogr -f GeoJSON -where "scalerank < 4" lakes_50m.json ne_50m_lakes.shp
-    ogr2ogr -f GeoJSON -where "scalerank < 2 AND admin='admin-0'" lakes_110m.json ne_110m_lakes.shp
-    ogr2ogr -f GeoJSON -simplify 1 coastline_tiny.json ne_110m_coastline.shp
-    ogr2ogr -f GeoJSON -simplify 1 -where "scalerank < 2 AND admin='admin-0'" lakes_tiny.json ne_110m_lakes.shp
-    topojson -o earth-topo.json coastline_50m.json coastline_110m.json lakes_50m.json lakes_110m.json
-    topojson -o earth-topo-mobile.json coastline_110m.json coastline_tiny.json lakes_110m.json lakes_tiny.json
-    cp earth-topo*.json <earth-git-repository>/public/data/
-
-getting weather data
---------------------
-
-Weather data is produced by the [Global Forecast System](http://en.wikipedia.org/wiki/Global_Forecast_System) (GFS),
-operated by the US National Weather Service. Forecasts are produced four times daily and made available for
-download from [NOMADS](http://nomads.ncep.noaa.gov/). The files are in [GRIB2](http://en.wikipedia.org/wiki/GRIB)
-format and contain over [300 records](http://www.nco.ncep.noaa.gov/pmb/products/gfs/gfs.t00z.pgrbf00.grib2.shtml).
-We need only a few of these records to visualize wind data at a particular isobar. The following commands download
-the 1000 hPa wind vectors and convert them to JSON format using the [grib2json](https://github.com/cambecc/grib2json)
-utility:
-
-    YYYYMMDD=<a date, for example: 20140101>
-    curl "http://nomads.ncep.noaa.gov/cgi-bin/filter_gfs.pl?file=gfs.t00z.pgrb2.1p00.f000&lev_10_m_above_ground=on&var_UGRD=on&var_VGRD=on&dir=%2Fgfs.${YYYYMMDD}00" -o gfs.t00z.pgrb2.1p00.f000
-    grib2json -d -n -o current-wind-surface-level-gfs-1.0.json gfs.t00z.pgrb2.1p00.f000
-    cp current-wind-surface-level-gfs-1.0.json <earth-git-repository>/public/data/weather/current
-
-font subsetting
----------------
-
-This project uses [M+ FONTS](http://mplus-fonts.sourceforge.jp/). To reduce download size, a subset font is
-constructed out of the unique characters utilized by the site. See the `earth/server/font/findChars.js` script
-for details. Font subsetting is performed by the [M+Web FONTS Subsetter](http://mplus.font-face.jp/), and
-the resulting font is placed in `earth/public/styles`.
-
-[Mono Social Icons Font](http://drinchev.github.io/monosocialiconsfont/) is used for scalable, social networking
-icons. This can be subsetted using [Font Squirrel's WebFont Generator](http://www.fontsquirrel.com/tools/webfont-generator).
-
-implementation notes
---------------------
-
-Building this project required solutions to some interesting problems. Here are a few:
-
-   * The GFS grid has a resolution of 1°. Intermediate points are interpolated in the browser using [bilinear
-     interpolation](http://en.wikipedia.org/wiki/Bilinear_interpolation). This operation is quite costly.
-   * Each type of projection warps and distorts the earth in a particular way, and the degree of distortion must
-     be calculated for each point (x, y) to ensure wind particle paths are rendered correctly. For example,
-     imagine looking at a globe where a wind particle is moving north from the equator. If the particle starts
-     from the center, it will trace a path straight up. However, if the particle starts from the globe's edge,
-     it will trace a path that curves toward the pole. [Finite difference approximations](http://gis.stackexchange.com/a/5075/23451)
-     are used to estimate this distortion during the interpolation process.
-   * The SVG map of the earth is overlaid with an HTML5 Canvas, where the animation is drawn. Another HTML5
-     Canvas sits on top and displays the colored overlay. Both canvases must know where the boundaries of the
-     globe are rendered by the SVG engine, but this pixel-for-pixel information is difficult to obtain directly
-     from the SVG elements. To workaround this problem, the globe's bounding sphere is re-rendered to a
-     detached Canvas element, and the Canvas' pixels operate as a mask to distinguish points that lie outside
-     and inside the globe's bounds.
-   * Most configuration options are persisted in the hash fragment to allow deep linking and back-button
-     navigation. I use a [backbone.js Model](http://backbonejs.org/#Model) to represent the configuration.
-     Changes to the model persist to the hash fragment (and vice versa) and trigger "change" events which flow to
-     other components.
-   * Components use [backbone.js Events](http://backbonejs.org/#Events) to trigger changes in other downstream
-     components. For example, downloading a new layer produces a new grid, which triggers reinterpolation, which
-     in turn triggers a new particle animator. Events flow through the page without much coordination,
-     sometimes causing visual artifacts that (usually) quickly disappear.
-   * There's gotta be a better way to do this. Any ideas?
-
-inspiration
+📄 Licencia
 -----------
 
-The awesome [hint.fm wind map](http://hint.fm/wind/) and [D3.js visualization library](http://d3js.org) provided
-the main inspiration for this project.
+**Ventus** es un fork de [earth](https://github.com/cambecc/earth) por Cameron Beccario,
+disponible bajo licencia MIT. Ver el repositorio original para más detalles:
+
+[https://github.com/cambecc/earth](https://github.com/cambecc/earth)
+
+🙌 Créditos
+-----------
+
+- **Cameron Beccario** — Autor original del proyecto [earth](https://github.com/cambecc/earth)
+- **Santiago Crespo** ([@santicopi](https://www.instagram.com/santicopi/)) — Modificaciones y fork
+- Construido con [Freebuff](https://freebuff.io) — AI-assisted coding tool
