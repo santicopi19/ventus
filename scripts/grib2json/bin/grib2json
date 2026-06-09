@@ -1,5 +1,19 @@
 #!/bin/sh
-#set -x
-LIB_DIR=$(dirname "$0")/../lib
-LAUNCH_JAR=$LIB_DIR/grib2json-*.jar
-$JAVA_HOME/bin/java -Xmx512M -jar $LAUNCH_JAR $@
+# grib2json wrapper — convert GRIB2 files to JSON
+# Uses java from PATH first, falls back to $JAVA_HOME
+
+LIB_DIR="$(cd "$(dirname "$0")/../lib" && pwd)"
+LAUNCH_JAR="$LIB_DIR/grib2json-*.jar"
+
+# Prefer java from PATH (most portable in Docker), fall back to JAVA_HOME
+JAVA_CMD=""
+if command -v java >/dev/null 2>&1; then
+    JAVA_CMD="java"
+elif [ -n "$JAVA_HOME" ] && [ -x "$JAVA_HOME/bin/java" ]; then
+    JAVA_CMD="$JAVA_HOME/bin/java"
+else
+    echo "ERROR: Java not found (tried PATH and JAVA_HOME)" >&2
+    exit 1
+fi
+
+exec "$JAVA_CMD" -Xmx512M -jar $LAUNCH_JAR "$@"

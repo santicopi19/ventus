@@ -11,10 +11,24 @@ const cron = require("node-cron");
 const { exec } = require("child_process");
 const fs = require("fs");
 
+// ─── Error handlers (catch-all diagnostics) ─────────────────────────────────
+process.on("uncaughtException", (err) => {
+  console.error(`[${new Date().toISOString()}] ❌ UNCAUGHT EXCEPTION:`, err.stack || err.message);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error(`[${new Date().toISOString()}] ❌ UNHANDLED REJECTION:`, reason);
+});
+
 const app = express();
 const PORT = process.env.PORT || 8080;
 const PUBLIC_DIR = path.join(__dirname, "public");
 const UPDATE_SCRIPT = path.join(__dirname, "scripts", "update-gfs.sh");
+
+console.log(`[${new Date().toISOString()}] 🔧 Starting Ventus server...`);
+console.log(`[${new Date().toISOString()}]   PORT env: "${process.env.PORT}" (using: ${PORT})`);
+console.log(`[${new Date().toISOString()}]   CWD: ${process.cwd()}`);
+console.log(`[${new Date().toISOString()}]   __dirname: ${__dirname}`);
+console.log(`[${new Date().toISOString()}]   Node version: ${process.version}`);
 
 // ─── Static file serving ───────────────────────────────────────────────────
 
@@ -109,7 +123,7 @@ setTimeout(() => {
 
 // ─── Start ─────────────────────────────────────────────────────────────────
 
-app.listen(PORT, "0.0.0.0", () => {
+const server = app.listen(PORT, "0.0.0.0", () => {
   console.log("");
   console.log("╔══════════════════════════════════════╗");
   console.log("║         Ventus — Weather Server      ║");
@@ -118,4 +132,10 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`  📂 Static:  ${PUBLIC_DIR}`);
   console.log(`  🕐 Cron:    0 4,10,16,22 * * * (every 6h, 4h after GFS runs)`);
   console.log("");
+  console.log(`[${new Date().toISOString()}] ✅ Server ready on port ${PORT}`);
+});
+
+server.on("error", (err) => {
+  console.error(`[${new Date().toISOString()}] ❌ Server failed to bind:`, err.message);
+  process.exit(1);
 });
