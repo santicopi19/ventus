@@ -41,9 +41,9 @@ var products = function() {
      * @param {String?} level
      * @returns {String}
      */
-    function gfs1p0degPath(attr, type, surface, level) {
+    function gfs0p5degPath(attr, type, surface, level) {
         var dir = attr.date, stamp = dir === "current" ? "current" : attr.hour;
-        var file = [stamp, type, surface, level, "gfs", "1.0"].filter(µ.isValue).join("-") + ".json?v=2";
+        var file = [stamp, type, surface, level, "gfs", "0.5"].filter(µ.isValue).join("-") + ".json?v=2";
         return [WEATHER_PATH, dir, file].join("/");
     }
 
@@ -119,7 +119,7 @@ var products = function() {
                         name: {en: "Wind", ja: "風速"},
                         qualifier: {en: " @ " + describeSurface(attr), ja: " @ " + describeSurfaceJa(attr)}
                     }),
-                    paths: [gfs1p0degPath(attr, "wind", attr.surface, attr.level)],
+                    paths: [gfs0p5degPath(attr, "wind", attr.surface, attr.level)],
                     date: gfsDate(attr),
                     builder: function(file) {
                         var uData = file[0].data, vData = file[1].data;
@@ -158,7 +158,7 @@ var products = function() {
                         name: {en: "Temp", ja: "気温"},
                         qualifier: {en: " @ " + describeSurface(attr), ja: " @ " + describeSurfaceJa(attr)}
                     }),
-                    paths: [gfs1p0degPath(attr, "temp", attr.surface, attr.level)],
+                    paths: [gfs0p5degPath(attr, "temp", attr.surface, attr.level)],
                     date: gfsDate(attr),
                     builder: function(file) {
                         var record = file[0], data = record.data;
@@ -205,7 +205,7 @@ var products = function() {
                         name: {en: "Relative Humidity", ja: "相対湿度"},
                         qualifier: {en: " @ " + describeSurface(attr), ja: " @ " + describeSurfaceJa(attr)}
                     }),
-                    paths: [gfs1p0degPath(attr, "relative_humidity", attr.surface, attr.level)],
+                    paths: [gfs0p5degPath(attr, "relative_humidity", attr.surface, attr.level)],
                     date: gfsDate(attr),
                     builder: function(file) {
                         var vars = file.variables;
@@ -242,7 +242,7 @@ var products = function() {
                         name: {en: "Air Density", ja: "空気密度"},
                         qualifier: {en: " @ " + describeSurface(attr), ja: " @ " + describeSurfaceJa(attr)}
                     }),
-                    paths: [gfs1p0degPath(attr, "air_density", attr.surface, attr.level)],
+                    paths: [gfs0p5degPath(attr, "air_density", attr.surface, attr.level)],
                     date: gfsDate(attr),
                     builder: function(file) {
                         var vars = file.variables;
@@ -331,7 +331,7 @@ var products = function() {
                         name: {en: "Total Cloud Water", ja: "雲水量"},
                         qualifier: ""
                     }),
-                    paths: [gfs1p0degPath(attr, "total_cloud_water")],
+                    paths: [gfs0p5degPath(attr, "total_cloud_water")],
                     date: gfsDate(attr),
                     builder: function(file) {
                         var record = file[0], data = record.data;
@@ -368,7 +368,7 @@ var products = function() {
                         name: {en: "Total Precipitable Water", ja: "可降水量"},
                         qualifier: ""
                     }),
-                    paths: [gfs1p0degPath(attr, "total_precipitable_water")],
+                    paths: [gfs0p5degPath(attr, "total_precipitable_water")],
                     date: gfsDate(attr),
                     builder: function(file) {
                         var record = file[0], data = record.data;
@@ -410,7 +410,7 @@ var products = function() {
                         name: {en: "Mean Sea Level Pressure", ja: "海面更正気圧"},
                         qualifier: ""
                     }),
-                    paths: [gfs1p0degPath(attr, "mean_sea_level_pressure")],
+                    paths: [gfs0p5degPath(attr, "mean_sea_level_pressure")],
                     date: gfsDate(attr),
                     builder: function(file) {
                         var record = file[0], data = record.data;

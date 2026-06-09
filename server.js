@@ -78,6 +78,45 @@ app.get("/api/update-gfs", (req, res) => {
   res.json({ status: "triggered" });
 });
 
+// Screenshot upload — client captures, server hosts
+app.post("/api/screenshot", express.json({ limit: "50mb" }), (req, res) => {
+  try {
+    const dataUri = req.body.image;
+    if (!dataUri) return res.status(400).json({ error: "No image data" });
+
+    const base64Data = dataUri.replace(/^data:image\/png;base64,/, "");
+    const now = new Date();
+    const ts = now.toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const dir = path.join(PUBLIC_DIR, "screenshots");
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const filename = `ventus-${ts}.png`;
+    fs.writeFileSync(path.join(dir, filename), base64Data, "base64");
+
+    console.log(`  📸 Screenshot saved: ${filename}`);
+    res.json({ url: `/screenshots/${filename}`, filename });
+  } catch (e) {
+    console.error("  ❌ Screenshot error:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// List forecast files available
+app.get("/api/forecasts", (req, res) => {
+  const dataDir = path.join(PUBLIC_DIR, "data", "weather", "current");
+  let files = [];
+  try {
+    if (fs.existsSync(dataDir)) {
+      files = fs.readdirSync(dataDir)
+        .filter(f => f.endsWith(".json") && !f.endsWith(".bak"))
+        .map(f => {
+          const stat = fs.statSync(path.join(dataDir, f));
+          return { file: f, size: stat.size, modified: stat.mtime.toISOString() };
+        });
+    }
+  } catch (e) { /* ignore */ }
+  res.json({ count: files.length, files });
+});
+
 // Service status endpoint
 app.get("/api/status", (req, res) => {
   const now = new Date();
@@ -177,6 +216,13 @@ cron.schedule("0 0 4,10,16,22 * * *", () => {
 
 // Run on startup (with a short delay to let the server start first)
 setTimeout(() => {
+  // Migrate old data filenames (1.0 → 0.5 resolution)
+  const oldData = path.join(PUBLIC_DIR, "data", "weather", "current", "current-wind-surface-level-gfs-1.0.json");
+  const newData = path.join(PUBLIC_DIR, "data", "weather", "current", "current-wind-surface-level-gfs-0.5.json");
+  if (fs.existsSync(oldData) && !fs.existsSync(newData)) {
+    fs.copyFileSync(oldData, newData);
+    console.log(`  📋 Migrated data file: 1.0 → 0.5`);
+  }
   runGfsUpdate();
 }, 5_000);
 

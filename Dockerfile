@@ -6,10 +6,11 @@
 # =============================================================================
 FROM node:20-slim
 
-# Install Java runtime (JRE) for grib2json, plus curl for downloading GFS data
+# Install Java runtime (JRE) for grib2json, curl for GFS downloads, ffmpeg for video processing
 RUN apt-get update && apt-get install -y --no-install-recommends \
     default-jre-headless \
     curl \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy pre-built grib2json distribution (jar + all dependencies + wrapper script)

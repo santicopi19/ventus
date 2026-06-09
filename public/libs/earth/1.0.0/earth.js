@@ -1204,9 +1204,22 @@
                     ctx.putImageData(imageData, 0, 0);
                     // Trigger download
                     var link = document.createElement("a");
-                    link.download = "earth-screenshot-" + new Date().toISOString().slice(0, 19).replace(/:/g, "-") + ".png";
-                    link.href = canvas.toDataURL("image/png");
+                    var pngData = canvas.toDataURL("image/png");
+                    link.download = "ventus-screenshot-" + new Date().toISOString().slice(0, 19).replace(/:/g, "-") + ".png";
+                    link.href = pngData;
                     link.click();
+
+                    // Also upload to server for sharing
+                    var xhr = new XMLHttpRequest();
+                    xhr.open("POST", "/api/screenshot", true);
+                    xhr.setRequestHeader("Content-Type", "application/json");
+                    xhr.onload = function() {
+                        if (xhr.status === 200) {
+                            var resp = JSON.parse(xhr.responseText);
+                            console.log("📸 Screenshot shared:", resp.url);
+                        }
+                    };
+                    xhr.send(JSON.stringify({ image: pngData }));
 
                     // Flash confirmation after capture completes
                     var flashEl = d3.select("#capture-flash");

@@ -565,26 +565,7 @@ Blur | [slider 0–30]                   ← Desenfoque gaussiano
 
 ## 5. ESTADO ACTUAL DEL MENÚ
 
-```
-┌──────────────────────────────────────────────┐
-│ ● CONTROL v2.4                          ▌    │
-├──────────────────────────────────────────────┤
-│ MODE    [AIR] [OCN]                          │
-│ PROJ    A AE CE E O S WB W3                  │
-│ ----------------------------------------     │
-│ VIEW    [MAP] [RST]                          │
-│ BRIGHT  [===========●===========] 100        │
-│ CNTRST  [===========●===========] 100        │
-│ BLUR    [===========●===========] 0.0        │
-│ SCALE   [===========●===========] 1.0        │
-│ CAPTURE [SCRSHT]                             │
-│ RECORD  [REC]  00:10                         │
-│          [24][30][60][120] [LOW][MID][HIGH]  │
-│ ABOUT   [ABOUT]                              │
-│ ----------------------------------------     │
-│ ■ ONLINE — ▌                                 │
-└──────────────────────────────────────────────┘
-```
+Ver sección 13 — Sesión 23 para el menú actualizado (v0.2.0).
 
 ---
 
@@ -873,6 +854,65 @@ lsof -ti :8080 | xargs kill -9                # Matar servidor
 
 ---
 
+### Sesión 23: Resolución 0.5°, Screenshot share, Time-lapse foundation, ffmpeg
+
+#### 4bi. Resolución GFS 0.5° (de 1.0°)
+- **Archivos:** `scripts/update-gfs.sh`, `public/libs/earth/1.0.0/products.js`, `server.js`
+- Cambio de `1p00` → `0p50` en todas las URLs de descarga GFS (NOMADS)
+- Cambio de sufijo `gfs-1.0.json` → `gfs-0.5.json` en nombres de archivo
+- Migración automática: `server.js` copia el archivo 1.0 existente a 0.5 en startup
+- **Impacto:** ~4× más resolución (~3MB → ~12MB por archivo JSON)
+- Renombrada función `gfs1p0degPath` → `gfs0p5degPath` en products.js
+
+#### 4bj. Endpoint de Screenshot compartido
+- **Archivos:** `server.js`, `public/libs/earth/1.0.0/earth.js`
+- `POST /api/screenshot` — Acepta base64 PNG, lo guarda en `public/screenshots/`, devuelve URL pública
+- Límite: 50MB por request
+- El frontend envía automáticamente cada captura al servidor después del download local
+- Útil para compartir capturas via URL permanente
+
+#### 4bk. API de pronósticos (timelapse foundation)
+- **Archivos:** `server.js`
+- `GET /api/forecasts` — Lista archivos de datos disponibles con tamaño y fecha
+- Infraestructura lista para futuros forecast hours (f003, f006, etc.)
+
+#### 4bl. ffmpeg en Docker
+- **Archivo:** `Dockerfile`
+- Agregado `ffmpeg` a las dependencias del contenedor
+- Prepara el terreno para generación de time-lapses server-side
+
+#### 4bm. Version bump
+- **Archivo:** `package.json`
+- `0.1.0` → `0.2.0` (semver — nuevas features)
+- Se incrementaron los cache-busters de JS/CSS afectados
+
+---
+
+### Menú actual (v0.2.0)
+
+```
+┌──────────────────────────────────────────────┐
+│ ● CONTROL v2.4                          ▌    │
+├──────────────────────────────────────────────┤
+│ MODE    [AIR] [OCN]                          │
+│ PROJ    A AE CE E O S WB W3                  │
+│ ----------------------------------------     │
+│ VIEW    [MAP] [RST]                          │
+│ BRIGHT  [===========●===========] 100        │
+│ CNTRST  [===========●===========] 100        │
+│ BLUR    [===========●===========] 0.0        │
+│ SCALE   [===========●===========] 1.0        │
+│ CAPTURE [SCRSHT]                             │
+│ RECORD  [REC]  00:10                         │
+│          [24][30][60][120] [LOW][MID][HIGH]  │
+│ ABOUT   [ABOUT]                              │
+│ ----------------------------------------     │
+│ ■ ONLINE — ▌                                 │
+└──────────────────────────────────────────────┘
+```
+
+---
+
 ## 14. ARQUITECTURA — BACKEND (server.js)
 
 ```
@@ -917,10 +957,10 @@ curl -X POST https://api.render.com/v1/services/srv-d8k672v7f7vs73c00mv0/deploys
 | Archivo | Versión |
 |---------|---------|
 | `styles.css` | `v=11` |
-| `earth.js` | `v=11` |
+| `earth.js` | `v=12` |
 | `micro.js` | `v=2` |
 | `globes.js` | `v=3` |
-| `products.js` | `v=2` |
+| `products.js` | `v=3` |
 | `d3.geo.projection.v0.min.js` | `v=2` |
 | `d3.geo.polyhedron.v0.min.js` | `v=2` |
 | `when.js` | `v=2` |
