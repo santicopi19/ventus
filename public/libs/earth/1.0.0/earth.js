@@ -319,7 +319,8 @@
                 moveStart: function() {
                     coastline.datum(mesh.coastLo);
                     lakes.datum(mesh.lakesLo);
-                    rendererAgent.trigger("start");
+                    // Stop animation without clearing canvas (prevent black screen)
+                    animatorAgent.cancel();
                 },
                 move: function() {
                     doDraw_throttled();
@@ -329,6 +330,12 @@
                     lakes.datum(mesh.lakesHi);
                     d3.selectAll("path").attr("d", path);
                     rendererAgent.trigger("render");
+                    // Re-interpolate field for new projection and restart animation
+                    var globe = globeAgent.value();
+                    var grids = gridAgent.value();
+                    if (globe && grids) {
+                        fieldAgent.submit(interpolateField, globe, grids);
+                    }
                 },
                 click: drawLocationMark
             });
