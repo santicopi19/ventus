@@ -75,7 +75,7 @@
 
             <!-- Mode controls -->
             <div class="term-line"><span class="term-key">MODE</span><span class="text-button" id="wind-mode-enable">[AIR]</span> <span class="text-button" id="ocean-mode-enable">[OCN]</span></div>
-            <div class="term-line ocean-mode invisible"><span class="term-key">ANIM</span><span class="text-button" id="animate-currents">[CURR]</span></div>
+            <!-- ANIM line removed -- ocean mode currents not used -->
 
             <!-- Projection -->
             <div class="term-line proj-line"><span class="term-key">PROJ</span><span class="proj text-button" id="atlantis">A</span> <span class="proj text-button" id="azimuthal_equidistant">AE</span> <span class="proj text-button" id="conic_equidistant">CE</span> <span class="proj text-button" id="equirectangular">E</span> <span class="proj text-button" id="orthographic">O</span> <span class="proj text-button" id="stereographic">S</span> <span class="proj text-button" id="waterman">WB</span> <span class="proj text-button" id="winkel3">W3</span></div>
@@ -87,6 +87,7 @@
             <div class="term-line"><span class="term-key">BRIGHT</span><div class="slider-track"><input type="range" id="brightness-slider" min="0" max="200" value="100" class="term-slider"></div><span class="term-value" id="brightness-value">100</span></div>
             <div class="term-line"><span class="term-key">CNTRST</span><div class="slider-track"><input type="range" id="contrast-slider" min="0" max="200" value="100" class="term-slider"></div><span class="term-value" id="contrast-value">100</span></div>
             <div class="term-line"><span class="term-key">BLUR</span><div class="slider-track"><input type="range" id="blur-slider" min="0" max="30" value="0" step="0.1" class="term-slider"></div><span class="term-value" id="blur-value">0.0</span></div>
+            <div class="term-line"><span class="term-key">SCALE</span><div class="slider-track"><input type="range" id="particle-scale-slider" min="0.1" max="5.0" value="1.0" step="0.1" class="term-slider"></div><span class="term-value" id="particle-scale-value">1.0</span></div>
 
             <!-- Screenshot capture -->
             <div class="term-line"><span class="term-key">CAPTURE</span><span class="text-button" id="capture-screenshot">[SCRSHT]</span></div>
@@ -126,7 +127,7 @@
     <script src="/libs/earth/1.0.0/micro.js?v=2" charset="utf-8"></script>
     <script src="/libs/earth/1.0.0/globes.js?v=3" charset="utf-8"></script>
     <script src="/libs/earth/1.0.0/products.js?v=2" charset="utf-8"></script>
-    <script src="/libs/earth/1.0.0/earth.js?v=10" charset="utf-8"></script>
+    <script src="/libs/earth/1.0.0/earth.js?v=11" charset="utf-8"></script>
 
 </body>
 </html>

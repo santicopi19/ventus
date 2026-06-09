@@ -570,13 +570,13 @@ Blur | [slider 0–30]                   ← Desenfoque gaussiano
 │ ● CONTROL v2.4                          ▌    │
 ├──────────────────────────────────────────────┤
 │ MODE    [AIR] [OCN]                          │
-│ ANIM    [CURR]                               │
 │ PROJ    A AE CE E O S WB W3                  │
 │ ----------------------------------------     │
 │ VIEW    [MAP] [RST]                          │
-│ BRIGHT  [===========●===========]            │
-│ CNTRST  [===========●===========]            │
-│ BLUR    [===========●===========]            │
+│ BRIGHT  [===========●===========] 100        │
+│ CNTRST  [===========●===========] 100        │
+│ BLUR    [===========●===========] 0.0        │
+│ SCALE   [===========●===========] 1.0        │
 │ CAPTURE [SCRSHT]                             │
 │ RECORD  [REC]  00:10                         │
 │          [24][30][60][120] [LOW][MID][HIGH]  │
@@ -856,6 +856,23 @@ lsof -ti :8080 | xargs kill -9                # Matar servidor
 
 ---
 
+### Sesión 22: Limpieza de panel + Slider de escala de partículas
+
+#### 4bg. Eliminación de ANIM (CURR)
+- **Archivos:** `public/index.html`
+- Se eliminó la línea `ANIM | [CURR]` del menú
+- Los handlers JS para `.ocean-mode` y `#animate-currents` quedan como código muerto inofensivo (D3 select en elementos inexistentes es no-op)
+
+#### 4bh. Slider SCALE — Control de tamaño de partículas
+- **Archivos:** `public/index.html`, `public/libs/earth/1.0.0/earth.js`
+- Nuevo slider `SCALE` debajo de BLUR (rango 0.1–5.0, default 1.0, step 0.1)
+- Afecta `g.lineWidth` en el canvas de animación — cambia el grosor de las estelas de viento
+- Se actualiza en tiempo real en cada frame (no necesita reiniciar la animación)
+- Botón RST resetea SCALE a 1.0
+- Muestra valor numérico al lado del slider (color ámbar)
+
+---
+
 ## 14. ARQUITECTURA — BACKEND (server.js)
 
 ```
@@ -900,7 +917,7 @@ curl -X POST https://api.render.com/v1/services/srv-d8k672v7f7vs73c00mv0/deploys
 | Archivo | Versión |
 |---------|---------|
 | `styles.css` | `v=11` |
-| `earth.js` | `v=10` |
+| `earth.js` | `v=11` |
 | `micro.js` | `v=2` |
 | `globes.js` | `v=3` |
 | `products.js` | `v=2` |

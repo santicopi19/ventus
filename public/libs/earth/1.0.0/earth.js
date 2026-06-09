@@ -20,7 +20,8 @@
     var OVERLAY_ALPHA = Math.floor(0.4*255);  // overlay transparency (on scale [0, 255])
     var INTENSITY_SCALE_STEP = 10;            // step size of particle intensity color scale
     var MAX_PARTICLE_AGE = 100;               // max number of frames a particle is drawn before regeneration
-    var PARTICLE_LINE_WIDTH = 1.0;            // line width of a drawn particle
+    var PARTICLE_LINE_WIDTH = 1.0;            // default line width of a drawn particle
+    var currentParticleScale = 1.0;           // current particle scale (controlled by SCALE slider)
     var PARTICLE_MULTIPLIER = 7;              // particle count scalar (completely arbitrary--this values looks nice)
     var PARTICLE_REDUCTION = 0.75;            // reduce particle count to this much of normal for mobile devices
     var FRAME_RATE = 40;                      // desired milliseconds per frame
@@ -577,7 +578,7 @@
         }
 
         var g = d3.select("#animation").node().getContext("2d");
-        g.lineWidth = PARTICLE_LINE_WIDTH;
+        g.lineWidth = currentParticleScale;
         g.fillStyle = fadeFillStyle;
 
         function draw() {
@@ -1069,10 +1070,19 @@
         d3.select("#contrast-slider").on("input", updateImageFilters);
         d3.select("#blur-slider").on("input", updateImageFilters);
 
+        // Particle scale control
+        d3.select("#particle-scale-slider").on("input", function() {
+            currentParticleScale = +d3.select(this).property("value");
+            d3.select("#particle-scale-value").text(currentParticleScale.toFixed(1));
+        });
+
         d3.select("#reset-image").on("click", function() {
             d3.select("#brightness-slider").property("value", 100);
             d3.select("#contrast-slider").property("value", 100);
             d3.select("#blur-slider").property("value", 0);
+            d3.select("#particle-scale-slider").property("value", 1.0);
+            currentParticleScale = 1.0;
+            d3.select("#particle-scale-value").text("1.0");
             updateImageFilters();
         });
 
