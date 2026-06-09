@@ -1,34 +1,26 @@
 # =============================================================================
-# Ventus — Dockerfile (single stage)
-#
-# Uses a pre-built grib2json distribution (committed at scripts/grib2json/)
-# so we avoid the ~15-minute Maven build on Render free tier.
+# Ventus — Minimal Dockerfile (no Java, debug first)
 # =============================================================================
 FROM node:20-slim
 
-# Install Java runtime (JRE) for grib2json, plus curl for downloading GFS data
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    default-jre-headless \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy pre-built grib2json distribution (jar + all dependencies + wrapper script)
-COPY scripts/grib2json /opt/grib2json
-
-# Set up environment
-ENV GRIB2JSON_HOME=/opt/grib2json
-ENV JAVA_HOME=/usr/lib/jvm/default-java
-
-# Set up the app
 WORKDIR /app
 
-# Copy package.json first (for better layer caching)
 COPY package.json package-lock.json* ./
-
 RUN npm install --production
 
-# Copy the rest of the app
 COPY . .
 
-# Start the server via startup script (diagnostics first)
-CMD ["/app/startup.sh"]
+# Minimal test: run a tiny inline server to verify basic Node works
+CMD node -e "
+console.log('=== VENTUS STARTUP (MINIMAL) ===');
+console.log('Node:', process.version);
+console.log('PORT:', process.env.PORT || 'not set');
+console.log('CWD:', process.cwd());
+const express = require('express');
+const app = express();
+const PORT = process.env.PORT || 8080;
+app.get('/health', (req, res) => res.json({status:'ok', uptime: process.uptime()}));
+app.use('/health', (req, res) => res.json({status:'ok', uptime: process.uptime()}));
+app.use(express.static('public'));
+app.listen(PORT, '0.0.0.0', () => console.log('Server ready on', PORT));
+"
