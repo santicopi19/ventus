@@ -96,7 +96,8 @@ function runGfsUpdate() {
 
 // Run every 6 hours, 4h after GFS model runs (gives ~1h for data to propagate to NOMADS)
 // GFS runs at 00, 06, 12, 18 UTC → we run at 04, 10, 16, 22 UTC
-cron.schedule("0 4,10,16,22 * * *", () => {
+// node-cron format: second minute hour dayOfMonth month dayOfWeek
+cron.schedule("0 0 4,10,16,22 * * *", () => {
   console.log(`[${new Date().toISOString()}] ⏰ Cron trigger: scheduled GFS update`);
   runGfsUpdate();
 });

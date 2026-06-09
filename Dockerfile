@@ -1,7 +1,7 @@
 # =============================================================================
 # STAGE 1: Build grib2json (Java → JAR)
 # =============================================================================
-FROM maven:3-eclipse-temurin-11 AS builder
+FROM maven:3.9-eclipse-temurin-21 AS builder
 
 WORKDIR /tmp/grib2json
 
