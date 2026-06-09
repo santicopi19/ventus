@@ -372,6 +372,17 @@ body {
     color: #cccccc;
 }
 
+/* ── Slider value display ── */
+.term-value {
+  color: #ffb000;
+  font-size: 0.7rem;
+  min-width: 2.5rem;
+  text-align: right;
+  margin-left: 0.4rem;
+  font-family: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
+  user-select: none;
+}
+
 /* ── Separator (edge-to-edge) ── */
 .term-sep {
     color: #222222;

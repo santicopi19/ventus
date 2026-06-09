@@ -64,10 +64,61 @@ app.use("/health", (req, res) => {
   });
 });
 
-// Manual trigger endpoint (protected, for cron-job.org)
+// ─── API endpoints ──────────────────────────────────────────────────────────
+
+// Manual trigger endpoint
 app.post("/update-gfs", (req, res) => {
   runGfsUpdate();
   res.json({ status: "triggered" });
+});
+
+// GET trigger (easier to test from browser)
+app.get("/api/update-gfs", (req, res) => {
+  runGfsUpdate();
+  res.json({ status: "triggered" });
+});
+
+// Service status endpoint
+app.get("/api/status", (req, res) => {
+  const now = new Date();
+  const cronHours = [4, 10, 16, 22];
+  const currentHour = now.getUTCHours();
+  const nextCron = cronHours.find(h => h > currentHour) ?? cronHours[0] + 24;
+  const nextRun = new Date(now);
+  nextRun.setUTCHours(nextCron, 0, 0, 0);
+  if (nextCron >= 24) nextRun.setUTCDate(nextRun.getUTCDate() + 1);
+
+  // Check data files
+  const dataDir = path.join(PUBLIC_DIR, "data", "weather", "current");
+  let dataFiles = {};
+  try {
+    if (fs.existsSync(dataDir)) {
+      const files = fs.readdirSync(dataDir);
+      files.filter(f => f.endsWith(".json") && !f.endsWith(".bak")).forEach(f => {
+        const stat = fs.statSync(path.join(dataDir, f));
+        dataFiles[f] = {
+          size: stat.size,
+          modified: stat.mtime.toISOString(),
+        };
+      });
+    }
+  } catch (e) { /* ignore */ }
+
+  res.json({
+    status: "ok",
+    service: "ventus",
+    uptime: process.uptime(),
+    nodeVersion: process.version,
+    memory: process.memoryUsage(),
+    lastGfsUpdate: global.__lastGfsUpdate || null,
+    cron: {
+      schedule: "0 0 4,10,16,22 * * *",
+      nextRun: nextRun.toISOString(),
+      description: "Every 6 hours (04, 10, 16, 22 UTC)",
+    },
+    dataFiles: dataFiles,
+    timestamp: now.toISOString(),
+  });
 });
 
 // ─── GFS Data Update ───────────────────────────────────────────────────────

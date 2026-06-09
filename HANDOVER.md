@@ -755,9 +755,157 @@ lsof -ti :8080 | xargs kill -9                # Matar servidor
 | `styles.css` | `v=10` |
 | `earth.js` | `v=9` |
 | `micro.js` | `v=2` |
-| `globes.js` | `v=2` |
+|| `globes.js` | `v=2` |
+|| `products.js` | `v=2` |
+|| `d3.geo.projection.v0.min.js` | `v=2` |
+|| `d3.geo.polyhedron.v0.min.js` | `v=2` |
+|| `when.js` | `v=2` |
+
+---
+
+## 13. HISTORIAL DE CAMBIOS — SESIONES 18+
+
+### Sesión 18: Deploy en Render.com — Server + Docker + Blueprint
+
+#### 4ar. Eliminación del prefijo /ventus/ (paths root-relative)
+- **Archivos:** `public/index.html`, `public/styles/styles.css`, `public/libs/earth/1.0.0/micro.js`, `public/libs/earth/1.0.0/products.js` (+ templates y jp)
+- Se eliminó `/ventus/...` de todos los paths de assets → rutas root-relative
+- **Razón:** El proyecto original usaba GitHub Pages con subpath. Render sirve desde la raíz.
+
+#### 4as. `server.js` — Servidor web Express con GFS auto-update
+- **Archivo:** `server.js` (nuevo, en raíz del proyecto)
+- Sirve archivos estáticos desde `public/` con `Cache-Control: no-cache` para HTML/JSON
+- Health check en `GET /health` para monitoreo de Render
+- **GFS auto-update** via `node-cron` cada 6h (04, 10, 16, 22 UTC)
+- Startup update: corre `update-gfs.sh` 5s después de iniciar
+- Endpoint manual: `GET /api/update-gfs` y `POST /update-gfs`
+
+#### 4at. `Dockerfile` — Multi-stage build (grib2json + Node.js)
+- **Stage 1:** Maven + JDK 11 para compilar grib2json desde fuente
+- **Stage 2:** node:20-slim con JRE + grib2json JAR
+
+#### 4au. `render.yaml` — Blueprint para Render.com
+- Web Service Docker, plan free, auto-deploy en push a master
+- Health check path: `/health`
+
+#### 4av. `package.json` actualizado
+- Express 3.x → `express@^4.18.2` + `node-cron@^3.0.3`
+
+---
+
+### Sesión 19: Fixes de build en Render
+
+#### 4aw. Fix Dockerfile: sed delimiter collision
+- El escapado incorrecto en `sed` causaba `exit code: 1` en build de Render
+- Cambiado delimitador de `/` a `@` y regex `[^<]*` para versionar Java
+
+#### 4ax. Fix Render health check: PORT
+- `render.yaml` forzaba `PORT: 8080` pero Render asigna `PORT=10000` para Docker
+- Eliminada variable PORT de `render.yaml`; server.js usa `process.env.PORT || 8080`
+
+---
+
+### Sesión 20: Fixes finales de deploy — Build rápido + Health check
+
+#### 4ay. Eliminación del builder Maven (build timeouteaba en free tier)
+- **Problema:** El stage de Maven tomaba ~15 minutos (descargar dependencias + compilar grib2json). Render free tier timeouteaba.
+- **Solución:** Compilar grib2json localmente (1.3s) y commitear el JAR + 22 dependencias al repo en `scripts/grib2json/` (15MB)
+- **Dockerfile simplificado:** Sin builder stage. Solo `apt-get install default-jre-headless` + copiar `scripts/grib2json/` a `/opt/grib2json/`
+- Build time reducido de ~15 min a ~75s
+
+#### 4az. Fix: grib2json JAR sin dependencias
+- **Problema:** El Dockerfile original solo copiaba `grib2json-*.jar` (20KB) pero el Class-Path del manifest necesitaba 22 JARs de dependencias (netcdf, slf4j, logback, etc.)
+- **Solución:** `COPY scripts/grib2json /opt/grib2json` copia el dist completo con `bin/` + `lib/*.jar`
+
+#### 4ba. Fix: grib2json wrapper script
+- El script original usaba `$JAVA_HOME/bin/java` sin fallback
+- Nuevo wrapper: prueba `java` del PATH primero, fallback a `$JAVA_HOME/bin/java`
+
+#### 4bb. Fix: Health check con trailing spaces (CAUSA RAÍZ)
+- **ProbleMA:** Render guardó `healthCheckPath: "/health   "` (con 3 espacios al final). Express `app.get("/health")` no matchea `/health   `.
+- El health check nunca respondía 200 → Render mantenía el deploy en `update_in_progress` hasta timeout
+- **Solución:** Catch-all middleware que responde 200 a cualquier path que empiece con `/health`
+- También se agregaron: `uncaughtException` handler, `unhandledRejection` handler, startup logging (Node version, PORT, CWD)
+
+#### 4bc. Fix: Cron schedule incorrecto
+- `"0 4,10,16,22 * * *"` en node-cron = seg:0, min:4,10,16,22, hora:* → corría cada hora
+- Corregido a `"0 0 4,10,16,22 * * *"` → corre a las 04:00, 10:00, 16:00, 22:00 UTC
+
+---
+
+### Sesión 21: Nuevas features backend + frontend
+
+#### 4bd. Endpoint `/api/status`
+- **Archivo:** `server.js`
+- `GET /api/status` — Devuelve JSON con:
+  - Estado del servidor, uptime, versión de Node
+  - Última actualización GFS y próxima corrida del cron
+  - Archivos de datos disponibles (tamaño, fecha de modificación)
+  - Uso de memoria del proceso
+
+#### 4be. Valores numéricos en sliders
+- **Archivos:** `public/index.html`, `public/styles/styles.css`, `public/libs/earth/1.0.0/earth.js`
+- Cada slider (BRIGHT, CNTRST, BLUR) ahora muestra su valor numérico al lado
+- Color ámbar `#ffb000`, tipografía monospace, actualización en tiempo real
+- CSS: `.term-value` con `min-width: 2.5rem`, `user-select: none`
+
+#### 4bf. Aumento de zoom máximo
+- **Archivo:** `public/libs/earth/1.0.0/globes.js`
+- `scaleExtent: [25, 3000]` → `[25, 8000]`
+- Permite hacer zoom mucho más profundo en el mapa
+
+---
+
+## 14. ARQUITECTURA — BACKEND (server.js)
+
+```
+Ventus Server (Express 4 + node-cron)
+├── GET  /              → Sirve index.html
+├── GET  /health*       → Health check (catch-all, tolera trailing spaces)
+├── GET  /api/status    → Estado del servidor (JSON)
+├── GET  /api/update-gfs → Trigger manual de actualización GFS
+├── POST /update-gfs    → Trigger manual (alternativo)
+├── Static: /public/*   → Archivos del frontend (CSS, JS, datos)
+└── Cron: 0 0 4,10,16,22 * * * → update-gfs.sh (cada 6h)
+
+GFS Update Pipeline:
+  NOMADS (NOAA) → GRIB2 → grib2json (Java) → JSON → /public/data/weather/current/
+```
+
+---
+
+## 15. COMANDOS RENDER
+
+```bash
+# Autenticación (guarda token en Keychain de macOS)
+render login
+
+# Ver servicios
+render services list
+
+# Ver logs en vivo
+render logs --resources srv-d8k672v7f7vs73c00mv0 --tail
+
+# Ver estado del servicio
+render services update srv-d8k672v7f7vs73c00mv0 --health-check-path "/health"
+
+# Triggear deploy manual
+curl -X POST https://api.render.com/v1/services/srv-d8k672v7f7vs73c00mv0/deploys
+```
+
+---
+
+## 16. CACHE-BUSTERS ACTUALIZADOS
+
+| Archivo | Versión |
+|---------|---------|
+| `styles.css` | `v=11` |
+| `earth.js` | `v=10` |
+| `micro.js` | `v=2` |
+| `globes.js` | `v=3` |
 | `products.js` | `v=2` |
 | `d3.geo.projection.v0.min.js` | `v=2` |
 | `d3.geo.polyhedron.v0.min.js` | `v=2` |
 | `when.js` | `v=2` |
+
 

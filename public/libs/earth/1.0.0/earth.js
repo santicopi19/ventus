@@ -1059,6 +1059,10 @@
             d3.select("#animation").style("filter", blurFilter);
             d3.select("#overlay").style("filter", blurFilter);
             d3.select("#foreground").style("filter", blurFilter);
+            // Update numeric value displays
+            d3.select("#brightness-value").text(brightness);
+            d3.select("#contrast-value").text(contrast);
+            d3.select("#blur-value").text(blur);
         }
 
         d3.select("#brightness-slider").on("input", updateImageFilters);
