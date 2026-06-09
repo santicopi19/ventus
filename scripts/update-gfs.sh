@@ -100,7 +100,7 @@ detect_hour() {
     fi
 
     for hour in $(printf "%02d\n%02d\n%02d\n%02d\n%02d" "$h" 18 12 06 00 | sort -rn | uniq); do
-        local url="https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p50.pl?file=gfs.t${hour}z.pgrb2.0p50.f000&${var_params}&dir=%2Fgfs.${ymd}%2F${hour}%2Fatmos"
+        local url="https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p50.pl?file=gfs.t${hour}z.pgrb2full.0p50.f000&${var_params}&dir=%2Fgfs.${ymd}%2F${hour}%2Fatmos"
         local status=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 "$url" 2>/dev/null || echo "000")
         if [[ "$status" == "200" ]]; then
             printf "%s" "$hour"
@@ -126,7 +126,7 @@ download_grib() {
         var_opt="var_UGRD=on&var_VGRD=on"
     fi
 
-    local url="https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p50.pl?file=gfs.t${hour}z.pgrb2.0p50.f000&${lev_opt}&${var_opt}&dir=%2Fgfs.${ymd}%2F${hour}%2Fatmos"
+    local url="https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p50.pl?file=gfs.t${hour}z.pgrb2full.0p50.f000&${lev_opt}&${var_opt}&dir=%2Fgfs.${ymd}%2F${hour}%2Fatmos"
 
     echo "⬇️  Descargando GFS ${ymd} ${hour}:00Z..."
     echo "   URL: $url"
