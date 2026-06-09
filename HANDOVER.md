@@ -899,11 +899,11 @@ lsof -ti :8080 | xargs kill -9                # Matar servidor
 
 ---
 
-### Menú actual (v0.2.0)
+### Menú actual (v0.066)
 
 ```
 ┌──────────────────────────────────────────────┐
-│ ● CONTROL v2.4                          ▌    │
+│ ● CONTROL v0.066                       ▌    │
 ├──────────────────────────────────────────────┤
 │ MODE    [AIR] [OCN]                          │
 │ PROJ    A AE CE E O S WB W3                  │
@@ -968,12 +968,27 @@ curl -X POST https://api.render.com/v1/services/srv-d8k672v7f7vs73c00mv0/deploys
 | Archivo | Versión |
 |---------|---------|
 | `styles.css` | `v=11` |
-| `earth.js` | `v=12` |
+| `earth.js` | `v=13` |
 | `micro.js` | `v=2` |
 | `globes.js` | `v=3` |
 | `products.js` | `v=3` |
 | `d3.geo.projection.v0.min.js` | `v=2` |
 | `d3.geo.polyhedron.v0.min.js` | `v=2` |
 | `when.js` | `v=2` |
+
+---
+
+## 17. CONVENCIÓN DE VERSIONADO
+
+El panel de control muestra la versión como `v0.xxx`, donde `xxx` es el número de cambios registrados en el HANDOVER (entradas con formato `#### 4xx.`). Cada vez que se agrega un cambio nuevo, se incrementa el número.
+
+- **Formato:** `0.xxx` (3 dígitos, padding con ceros)
+- **Ejemplo:** cambio #66 → `v0.066`
+- **package.json** usa semver estándar para npm, independiente del panel
+- **Cache-busters** (`?v=N`) se incrementan individualmente por archivo
+
+| Versión panel | Cambio # | Último cambio |
+|---|:---:|---|
+| v0.066 | 66 | 4bn — Preservación de partículas durante zoom |
 
 
