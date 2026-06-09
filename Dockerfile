@@ -1,21 +1,8 @@
 # =============================================================================
-# STAGE 1: Build grib2json (Java → JAR)
-# =============================================================================
-FROM maven:3.9-eclipse-temurin-21 AS builder
-
-WORKDIR /tmp/grib2json
-
-# Clone grib2json source
-RUN git clone --depth 1 https://github.com/cambecc/grib2json.git .
-
-# Patch pom.xml for Java 11 (the original targets Java 7)
-RUN sed -i 's@<maven.compiler.source>[^<]*</maven.compiler.source>@<maven.compiler.source>11</maven.compiler.source>@; s@<maven.compiler.target>[^<]*</maven.compiler.target>@<maven.compiler.target>11</maven.compiler.target>@' pom.xml
-
-# Build the JAR (skip tests to speed up)
-RUN mvn package -DskipTests
-
-# =============================================================================
-# STAGE 2: Runtime — Node.js + Java (JRE only) + grib2json
+# Ventus — Dockerfile (single stage)
+#
+# pre-built grib2json distribution (committed at scripts/grib2json/) so we
+# avoid the ~15-minute Maven build on Render free tier.
 # =============================================================================
 FROM node:20-slim
 
@@ -25,13 +12,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy grib2json JAR and create wrapper script
-COPY --from=builder /tmp/grib2json/target/grib2json-*.jar /opt/grib2json/grib2json.jar
-
-RUN mkdir -p /opt/grib2json/bin && \
-    echo '#!/bin/bash' > /opt/grib2json/bin/grib2json && \
-    echo 'exec java -jar /opt/grib2json/grib2json.jar "$@"' >> /opt/grib2json/bin/grib2json && \
-    chmod +x /opt/grib2json/bin/grib2json
+# Copy pre-built grib2json distribution (jar + all dependencies + wrapper script)
+COPY scripts/grib2json /opt/grib2json
 
 # Set up environment
 ENV GRIB2JSON_HOME=/opt/grib2json
