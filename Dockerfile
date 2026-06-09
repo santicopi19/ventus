@@ -1,8 +1,8 @@
 # =============================================================================
 # Ventus — Dockerfile (single stage)
 #
-# pre-built grib2json distribution (committed at scripts/grib2json/) so we
-# avoid the ~15-minute Maven build on Render free tier.
+# Uses a pre-built grib2json distribution (committed at scripts/grib2json/)
+# so we avoid the ~15-minute Maven build on Render free tier.
 # =============================================================================
 FROM node:20-slim
 
@@ -30,7 +30,5 @@ RUN npm install --production
 # Copy the rest of the app
 COPY . .
 
-EXPOSE 8080
-
-# Start the server
-CMD ["node", "server.js"]
+# Start the server via startup script (diagnostics first)
+CMD ["/app/startup.sh"]
