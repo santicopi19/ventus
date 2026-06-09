@@ -32,6 +32,14 @@ console.log(`[${new Date().toISOString()}]   Node version: ${process.version}`);
 
 // ─── Static file serving ───────────────────────────────────────────────────
 
+// CATCH-ALL: respond 200 to any health check path (Render may add trailing spaces)
+app.use((req, res, next) => {
+  if (req.path.startsWith("/health")) {
+    return res.json({ status: "ok", uptime: process.uptime() });
+  }
+  next();
+});
+
 app.use(express.static(PUBLIC_DIR, {
   maxAge: "1h",
   setHeaders: (res, filePath) => {
