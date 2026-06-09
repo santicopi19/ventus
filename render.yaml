@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: ventus
+    env: docker
+    repo: https://github.com/santicopi19/ventus
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8080

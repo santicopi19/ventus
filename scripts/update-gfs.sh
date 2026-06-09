@@ -7,7 +7,11 @@
 #   ./scripts/update-gfs.sh --hour 00     # Forzar hora específica (00, 06, 12, 18)
 #   ./scripts/update-gfs.sh --check       # Solo verifica prerequisitos
 #
-# Requiere: Java OpenJDK, grib2json (ver HANDOVER.md sección 9)
+# Requiere: Java (JRE), grib2json (ver Dockerfile para instalación automatizada)
+#
+# Variables de entorno:
+#   GRIB2JSON_HOME  Path al directorio de grib2json (default: /opt/grib2json)
+#   JAVA_HOME       Path al JDK/JRE (default: auto-detect)
 
 set -euo pipefail
 
@@ -15,8 +19,14 @@ set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DATA_DIR="$PROJECT_DIR/public/data/weather/current"
-GRIB2JSON_HOME="/tmp/grib2json-0.8.0-SNAPSHOT"
-JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk}"
+GRIB2JSON_HOME="${GRIB2JSON_HOME:-/opt/grib2json}"
+
+# En Docker, use el Java del sistema; en macOS, buscar en Homebrew
+if command -v java &>/dev/null; then
+    JAVA_CMD="java"
+else
+    JAVA_CMD="${JAVA_HOME:-/opt/homebrew/opt/openjdk}/bin/java"
+fi
 
 # Tipo de dato: "wind" o "temp" (por defecto: wind)
 TYPE="wind"
@@ -41,16 +51,15 @@ done
 check_prereqs() {
     local ok=true
 
-    if ! command -v java &>/dev/null && ! "$JAVA_HOME/bin/java" -version &>/dev/null 2>&1; then
-        echo "❌ Java no encontrado. Instalar con: brew install openjdk"
+    if ! $JAVA_CMD -version &>/dev/null 2>&1; then
+        echo "❌ Java no encontrado."
         ok=false
     else
-        echo "✅ Java: OK ($("$JAVA_HOME/bin/java" -version 2>&1 | head -1))"
+        echo "✅ Java: OK ($($JAVA_CMD -version 2>&1 | head -1))"
     fi
 
     if [[ ! -f "$GRIB2JSON_HOME/bin/grib2json" ]]; then
         echo "❌ grib2json no encontrado en $GRIB2JSON_HOME"
-        echo "   Recompilar: cd /tmp/grib2json && mvn package -DskipTests"
         ok=false
     else
         echo "✅ grib2json: OK ($GRIB2JSON_HOME/bin/grib2json)"
@@ -71,7 +80,7 @@ check_prereqs() {
 
     if ! $ok; then
         echo ""
-        echo "❌ Prerequisitos faltantes. Revisá HANDOVER.md sección 9."
+        echo "❌ Prerequisitos faltantes."
         exit 1
     fi
 }
@@ -80,11 +89,9 @@ check_prereqs() {
 
 detect_hour() {
     local ymd="$1"
-    # Probar en orden: hora actual redondeada hacia abajo, luego 18, 12, 06, 00
     local h=$(date -u +%H)
-    h=$(( h / 6 * 6 ))  # Redondear a 00, 06, 12, 18
+    h=$(( h / 6 * 6 ))
 
-    # Elegir parámetros según el tipo de dato solicitado
     local var_params
     if [[ "$TYPE" == "temp" ]]; then
         var_params="lev_2_m_above_ground=on&var_TMP=on"
@@ -110,7 +117,6 @@ download_grib() {
     local hour="$2"
     local tmpfile="$3"
 
-    # Parámetros según el tipo
     local lev_opt var_opt
     if [[ "$TYPE" == "temp" ]]; then
         lev_opt="lev_2_m_above_ground=on"
@@ -134,8 +140,8 @@ download_grib() {
         return 1
     }
 
-    local size=$(stat -f%z "$tmpfile" 2>/dev/null || stat -c%s "$tmpfile" 2>/dev/null)
-    echo "   Descargado: $(numfmt --to=iec $size 2>/dev/null || echo "${size} bytes")"
+    local size=$(stat -c%s "$tmpfile" 2>/dev/null || stat -f%z "$tmpfile" 2>/dev/null)
+    echo "   Descargado: ${size} bytes"
     return 0
 }
 
@@ -152,21 +158,16 @@ convert_json() {
     fi
 
     echo "🔄 Convirtiendo a JSON..."
-    export JAVA_HOME
-    export PATH="$JAVA_HOME/bin:$PATH"
 
-    # Redirigir stderr de grib2json a stderr (no a stdout) para no contaminar
     "$GRIB2JSON_HOME/bin/grib2json" -d -n \
         -o "$output_file" \
         "$grib" 2>/dev/null || {
         echo "❌ Error en conversión grib2json" >&2
-        echo "   ¿El archivo GRIB2 es válido? Verificar con: file $grib" >&2
         return 1
     }
 
-    local size=$(stat -f%z "$output_file" 2>/dev/null || stat -c%s "$output_file" 2>/dev/null)
-    echo "   JSON generado: $(numfmt --to=iec $size 2>/dev/null || echo "${size} bytes")"
-    # No imprimir output_file — el caller ya sabe el path
+    local size=$(stat -c%s "$output_file" 2>/dev/null || stat -f%z "$output_file" 2>/dev/null)
+    echo "   JSON generado: ${size} bytes"
 }
 
 # ─── Copiar al proyecto ──────────────────────────────────────────────────────
@@ -206,13 +207,13 @@ header = data[0]['header'] if isinstance(data, list) else data.get('header', {})
 ref = header.get('refTime', 'N/A')
 print(f'📅 Fecha del dato: {ref}')
 print(f'📊 Registros: {len(data) if isinstance(data, list) else \"N/A\"}')
-"
+" 2>/dev/null || echo "   (no se pudo leer fecha)"
 }
 
 # ─── Main ────────────────────────────────────────────────────────────────────
 
 echo "╔══════════════════════════════════════╗"
-echo "║   🌍 Earth — Actualizar Datos GFS   ║"
+echo "║   Ventus — Actualizar Datos GFS      ║"
 echo "╚══════════════════════════════════════╝"
 echo ""
 
@@ -241,7 +242,7 @@ else
 fi
 echo ""
 
-# Temp file (sin extensión — macOS mktemp requiere X al final)
+# Temp file
 GRIB_TMP=$(mktemp /tmp/gfs_data.XXXXXX)
 trap "rm -f $GRIB_TMP" EXIT
 
@@ -252,4 +253,3 @@ copy_to_project || exit 1
 
 echo ""
 echo "🎉 ¡Datos actualizados exitosamente!"
-echo "   Recargá http://localhost:8080 para ver los cambios."

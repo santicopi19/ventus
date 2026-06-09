@@ -1,7 +1,7 @@
 {
-    "name": "earth",
-    "description": "Earth",
-    "version": "0.0.1",
+    "name": "ventus",
+    "description": "Ventus — animated map of global wind and weather",
+    "version": "0.1.0",
     "private": true,
     "author": {
         "name": "Cameron Beccario",
@@ -12,15 +12,13 @@
         "type": "git",
         "url": "git://github.com/cambecc/earth.git"
     },
-    "engine": "node >= 0.10.21",
+    "engine": "node >= 18",
     "dependencies": {
-        "when": "2.6.0",
-        "swig": "1.2.2",
-        "mkdirp": "0.3.5",
-        "express": "3.4.4"
+        "express": "^4.18.2",
+        "node-cron": "^3.0.3"
     },
-    "devDependencies": {
-        "grunt": "~0.4.1",
-        "grunt-contrib-jshint": "~0.7.1"
+    "devDependencies": {},
+    "scripts": {
+        "start": "node server.js"
     }
 }
