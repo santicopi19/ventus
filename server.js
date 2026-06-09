@@ -47,8 +47,8 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "index.html"));
 });
 
-// Health check endpoint (useful for Render monitoring)
-app.get("/health", (req, res) => {
+// Health check endpoint (handles /health and /health with trailing chars)
+app.use("/health", (req, res) => {
   res.json({
     status: "ok",
     uptime: process.uptime(),
