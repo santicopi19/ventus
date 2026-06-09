@@ -319,8 +319,6 @@
                 moveStart: function() {
                     coastline.datum(mesh.coastLo);
                     lakes.datum(mesh.lakesLo);
-                    // Stop animation without clearing canvas (prevent black screen)
-                    animatorAgent.cancel();
                 },
                 move: function() {
                     doDraw_throttled();
@@ -330,6 +328,8 @@
                     lakes.datum(mesh.lakesHi);
                     d3.selectAll("path").attr("d", path);
                     rendererAgent.trigger("render");
+                    // Remove D3 CSS transform (we use projection scale, not CSS scale)
+                    d3.select("#display").style("transform", null).attr("transform", null);
                     // Re-interpolate field for new projection and restart animation
                     var globe = globeAgent.value();
                     var grids = gridAgent.value();
