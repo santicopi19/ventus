@@ -9,7 +9,7 @@ WORKDIR /tmp/grib2json
 RUN git clone --depth 1 https://github.com/cambecc/grib2json.git .
 
 # Patch pom.xml for Java 11 (the original targets Java 7)
-RUN sed -i 's@<maven.compiler.source>1.7</maven.compiler.source>@<maven.compiler.source>11</maven.compiler.source>@; s@<maven.compiler.target>1.7</maven.compiler.target>@<maven.compiler.target>11</maven.compiler.target>@' pom.xml
+RUN sed -i 's@<maven.compiler.source>[^<]*</maven.compiler.source>@<maven.compiler.source>11</maven.compiler.source>@; s@<maven.compiler.target>[^<]*</maven.compiler.target>@<maven.compiler.target>11</maven.compiler.target>@' pom.xml
 
 # Build the JAR (skip tests to speed up)
 RUN mvn package -DskipTests -q
