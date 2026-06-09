@@ -12,7 +12,7 @@ RUN git clone --depth 1 https://github.com/cambecc/grib2json.git .
 RUN sed -i 's@<maven.compiler.source>[^<]*</maven.compiler.source>@<maven.compiler.source>11</maven.compiler.source>@; s@<maven.compiler.target>[^<]*</maven.compiler.target>@<maven.compiler.target>11</maven.compiler.target>@' pom.xml
 
 # Build the JAR (skip tests to speed up)
-RUN mvn package -DskipTests -q
+RUN mvn package -DskipTests
 
 # =============================================================================
 # STAGE 2: Runtime — Node.js + Java (JRE only) + grib2json

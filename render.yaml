@@ -3,7 +3,10 @@ services:
     name: ventus
     env: docker
     repo: https://github.com/santicopi19/ventus
+    branch: master
     plan: free
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /health
+    autoDeploy: true
+    numInstances: 1
