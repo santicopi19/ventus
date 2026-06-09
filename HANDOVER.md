@@ -888,6 +888,17 @@ lsof -ti :8080 | xargs kill -9                # Matar servidor
 
 ---
 
+### Sesión 24: Fix — Partículas no se resetean al hacer zoom
+
+#### 4bn. Preservación de partículas durante zoom
+- **Archivo:** `public/libs/earth/1.0.0/earth.js`
+- **Problema:** `animate()` creaba partículas nuevas cada vez que se llamaba. Durante un zoom, el campo se re-interpola y `animate()` se ejecuta de nuevo → partículas en posiciones distintas → salto visual.
+- **Solución:** Guardar las partículas entre llamadas (`animate._prevParticles`). Si el objeto `grids` es el mismo (mismos datos, solo cambió proyección/zoom), reciclar las partículas existentes en vez de crear nuevas.
+- **Tres condiciones para reciclar:** (1) hay partículas previas, (2) el objeto `grids` es idéntico (referencia), (3) el conteo de partículas no cambió.
+- Cuando los datos GFS cambian (nuevo `grids`), se crean partículas frescas como antes.
+
+---
+
 ### Menú actual (v0.2.0)
 
 ```

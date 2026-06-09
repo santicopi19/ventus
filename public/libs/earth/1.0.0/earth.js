@@ -540,10 +540,26 @@
         var fadeFillStyle = µ.isFF() ? "rgba(0, 0, 0, 0.95)" : "rgba(0, 0, 0, 0.97)";  // FF Mac alpha behaves oddly
 
         log.debug("particle count: " + particleCount);
-        var particles = [];
-        for (var i = 0; i < particleCount; i++) {
-            particles.push(field.randomize({age: _.random(0, MAX_PARTICLE_AGE)}));
+        // Reuse particles when only zoom changed (grid data is the same object)
+        if (animate._prevParticles && animate._prevGrids === grids && animate._prevCount === particleCount) {
+            // Same weather data, different view → keep particles, just re-evolve
+            var particles = animate._prevParticles;
+            // Reset age for particles that expired during the animation halt
+            for (var i = 0; i < particles.length; i++) {
+                if (particles[i].age > MAX_PARTICLE_AGE) {
+                    field.randomize(particles[i]).age = Math.floor(particles[i].age / 2);
+                }
+            }
+        } else {
+            // New weather data → create fresh particles
+            var particles = [];
+            for (var i = 0; i < particleCount; i++) {
+                particles.push(field.randomize({age: _.random(0, MAX_PARTICLE_AGE)}));
+            }
         }
+        animate._prevParticles = particles;
+        animate._prevGrids = grids;
+        animate._prevCount = particleCount;
 
         function evolve() {
             buckets.forEach(function(bucket) { bucket.length = 0; });
