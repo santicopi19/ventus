@@ -89,9 +89,18 @@ check_prereqs() {
 
 detect_hour() {
     local ymd="$1"
-    local prev_ymd=$(date -u -d "yesterday" +%Y%m%d 2>/dev/null || date -u -v-1d +%Y%m%d 2>/dev/null || echo "")
-    local h=$(date -u +%H)
-    h=$(( h / 6 * 6 ))
+    # Try current day first, then previous day
+    # (date -d "yesterday" may not work in all slim Docker images)
+    local prev_ymd
+    if date -u -d "yesterday" +%Y%m%d >/dev/null 2>&1; then
+        prev_ymd=$(date -u -d "yesterday" +%Y%m%d)
+    elif date -u -v-1d +%Y%m%d >/dev/null 2>&1; then
+        prev_ymd=$(date -u -v-1d +%Y%m%d)
+    else
+        # Manual calculation
+        local y="${ymd:0:4}" m="${ymd:4:2}" d="${ymd:6:2}"
+        prev_ymd=$(printf "%04d%02d%02d" $((10#$y - (10#$m == 1 && 10#$d == 1 ? 1 : 0))) $((10#$m == 1 && 10#$d == 1 ? 12 : 10#$m - (10#$d == 1 ? 1 : 0))) $((10#$d == 1 ? 31 : 10#$d - 1)))
+    fi
 
     local var_params
     if [[ "$TYPE" == "temp" ]]; then
@@ -100,15 +109,13 @@ detect_hour() {
         var_params="lev_10_m_above_ground=on&var_UGRD=on&var_VGRD=on"
     fi
 
-    # Try current day first, then previous day
     for ymd_try in "$ymd" "$prev_ymd"; do
         [[ -z "$ymd_try" ]] && continue
-        for hour in $(printf "%02d\n%02d\n%02d\n%02d\n%02d" "$h" 18 12 06 00 | sort -rn | uniq); do
+        for hour in 18 12 06 00; do
             local url="https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p50.pl?file=gfs.t${hour}z.pgrb2full.0p50.f000&${var_params}&dir=%2Fgfs.${ymd_try}%2F${hour}%2Fatmos"
             local status=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 "$url" 2>/dev/null || echo "000")
             if [[ "$status" == "200" ]]; then
-                YYYYMMDD="$ymd_try"
-                printf "%s" "$hour"
+                echo "${ymd_try}:${hour}"
                 return 0
             fi
         done
