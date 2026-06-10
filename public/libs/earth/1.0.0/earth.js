@@ -1384,6 +1384,18 @@
             return (+d3.select(".rec-quality.highlighted").attr("data-bitrate") || 2500) * 1000;
         }
 
+        // Resolution scale selector
+        d3.selectAll(".rec-scale").on("click", function() {
+            d3.selectAll(".rec-scale").classed("highlighted", false);
+            d3.select(this).classed("highlighted", true);
+        });
+
+        function getSelectedScale() {
+            var val = d3.select(".rec-scale.highlighted").attr("data-scale");
+            if (val === "retina") return window.devicePixelRatio || 2;
+            return +val || 1;
+        }
+
         function parseDuration(str) {
             // Accept MM:SS or just seconds as number
             var trimmed = str.trim();
@@ -1447,10 +1459,7 @@
             if (recorder && recorder.state === "recording") {
                 recorder.stop();
             }
-            if (renderInterval) {
-                clearInterval(renderInterval);
-                renderInterval = null;
-            }
+            renderInterval = null;
             if (recordingTimer) {
                 clearTimeout(recordingTimer);
                 recordingTimer = null;
@@ -1484,9 +1493,11 @@
                 details.classed("invisible", true);
             }
 
-            var w = view.width, h = view.height;
+            var recScale = getSelectedScale();
+            var w = Math.floor(view.width * recScale);
+            var h = Math.floor(view.height * recScale);
 
-            // Create offscreen canvas for compositing all layers
+            // Create offscreen canvas for compositing all layers at target resolution
             var offCanvas = document.createElement("canvas");
             offCanvas.width = w;
             offCanvas.height = h;
@@ -1496,7 +1507,7 @@
             var animCanvas = d3.select("#animation").node();
             var overlayCanvas = d3.select("#overlay").node();
 
-            // Serialize static SVG layers to Images (async)
+            // Serialize static SVG layers to Images at target resolution (async)
             when.all([
                 svgToImage(d3.select("#map").node(), w, h),
                 svgToImage(d3.select("#foreground").node(), w, h)
@@ -1537,10 +1548,7 @@
 
                 recorder.onstop = function() {
                     recordingStarting = false;
-                    if (renderInterval) {
-                        clearInterval(renderInterval);
-                        renderInterval = null;
-                    }
+                    renderInterval = null;
                     if (recordingTimer) {
                         clearTimeout(recordingTimer);
                         recordingTimer = null;
@@ -1567,10 +1575,7 @@
 
                 recorder.onerror = function() {
                     recordingStarting = false;
-                    if (renderInterval) {
-                        clearInterval(renderInterval);
-                        renderInterval = null;
-                    }
+                    renderInterval = null;
                     if (recordingTimer) {
                         clearTimeout(recordingTimer);
                         recordingTimer = null;
@@ -1585,14 +1590,25 @@
                     recorder = null;
                 };
 
-                // Render loop: composite all layers onto offscreen canvas at selected fps (recFps already set above)
-                // Grayscale + brightness + contrast are ALWAYS applied via pixel manipulation
-                // because CSS filters on #display don't apply to the offscreen canvas.
+                // Render loop: composite all layers onto offscreen canvas at target fps
+                // Uses requestAnimationFrame for smooth compositing with browser refresh
                 var timerEl = d3.select("#recording-timer");
                 var recStartTime = Date.now();
                 var totalMs = durationSec * 1000;
+                var lastFrameTime = 0;
+                var frameInterval = 1000 / recFps;
 
-                renderInterval = setInterval(function() {
+                function renderFrame(timestamp) {
+                    // Check if animation was cancelled
+                    if (!renderInterval) return;
+                    // Throttle to target fps
+                    var delta = timestamp - lastFrameTime;
+                    if (delta < frameInterval) {
+                        requestAnimationFrame(renderFrame);
+                        return;
+                    }
+                    lastFrameTime = timestamp - (delta % frameInterval);
+
                     // Update countdown timer (DOM only, not captured in video)
                     var elapsed = Date.now() - recStartTime;
                     var remaining = Math.max(0, Math.round((totalMs - elapsed) / 1000));
@@ -1633,9 +1649,14 @@
                         data[i] = data[i+1] = data[i+2] = val;
                     }
                     offCtx.putImageData(imageData, 0, 0);
-                }, Math.round(1000 / recFps)); // ~fps
+                };
 
+                // Show recording timer
                 d3.select("#recording-timer").classed("invisible", false);
+
+                // Start render loop with requestAnimationFrame
+                renderInterval = true;
+                requestAnimationFrame(renderFrame);
 
                 recorder.start(1000);
 
