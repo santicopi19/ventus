@@ -561,6 +561,15 @@ body {
     color: #666666;
 }
 
+.rec-scale-group .rec-scale.text-button.highlighted {
+    color: #ffb000;
+    text-shadow: 0 0 4px rgba(255, 176, 0, 0.4);
+}
+
+.rec-scale-group .rec-scale.text-button:hover {
+    color: #ffb000;
+}
+
 .rec-quality-group .rec-quality.text-button {
     font-size: 0.6rem;
     padding: 0.03rem 0.12rem;
