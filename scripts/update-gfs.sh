@@ -89,7 +89,7 @@ check_prereqs() {
 
 detect_hour() {
     local ymd="$1"
-    local prev_ymd=$(date -u -d "$ymd -1 day" +%Y%m%d 2>/dev/null || date -u -j -v-1d +%Y%m%d 2>/dev/null || echo "")
+    local prev_ymd=$(python3 -c "from datetime import datetime,timedelta; print((datetime.strptime('$ymd','%Y%m%d')-timedelta(1)).strftime('%Y%m%d'))" 2>/dev/null || echo "")
     local h=$(date -u +%H)
     h=$(( h / 6 * 6 ))
 
