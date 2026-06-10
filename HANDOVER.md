@@ -899,11 +899,80 @@ lsof -ti :8080 | xargs kill -9                # Matar servidor
 
 ---
 
-### Menú actual (v0.066)
+### Sesión 25: Fix URL 0.5° + detect_hour + timeouts
+
+#### 4bo. Fix URL GFS 0.5° (pgrb2full)
+- **Archivo:** `scripts/update-gfs.sh`
+- La URL correcta para 0.5° usa `pgrb2full.0p50` no `pgrb2.0p50`
+- HTTP 500 → HTTP 200
+
+#### 4bp. Fix detect_hour: subshell + fallback día anterior
+- **Archivo:** `scripts/update-gfs.sh`
+- `$(detect_hour)` corre en subshell → modificaciones a `YYYYMMDD` no se propagaban
+- Se cambió a retornar `echo "${ymd_try}:${hour}"` y parsear con `${DETECTED%%:*}`
+- Se agregó fallback a día anterior (`date -d "yesterday"`)
+- Se aumentó `curl --max-time` de 120s a 180s y exec timeout de 5 a 10 min
+
+---
+
+### Sesión 26: Perlin spatial smoothing + Meta tags + GFS date en panel
+
+#### 4bq. Perlin spatial smoothing (reemplaza Gaussian blur)
+- **Archivo:** `public/libs/earth/1.0.0/earth.js`
+- Nueva función `perlinSmooth(ctx, w, h, spacing)` que reemplaza `ctx.filter = "blur(Xpx)"`
+- Algoritmo: downsampling a grilla gruesa → smoothstep (6t⁵-15t⁴+10t³) → bilinear interpolation
+- Se agregó `currentGridSpacing`, controlado por el slider BLUR (antes era radio gaussiano)
+- Se quitó CSS blur de `#map`, `#animation`, `#overlay`, `#foreground`
+- Se documentó estado anterior en `ref-blur.md`
+
+#### 4br. Meta tags OG + GFS date en panel
+- **Archivo:** `public/index.html`, `public/libs/earth/1.0.0/earth.js`
+- OG tags actualizados: title, description, url, author para Ventus
+- Twitter card agregada
+- Se agregó `<span id="data-date">` en el footer del panel, junto a ONLINE
+- El `showDate()` existente en earth.js lo puebla automáticamente
+
+---
+
+### Sesión 27: Documentación captura + Retina recording + rAF render loop
+
+#### 4bs. Documentación de captura (screenshot + recording)
+- **Archivo:** `ref-capture.md` (nuevo)
+- Documenta todo el pipeline: html2canvas, canvas.captureStream, MediaRecorder
+- Incluye funciones auxiliares, selectores FPS/calidad, limitaciones conocidas
+
+#### 4bt. Retina recording + ULTRA bitrate + rAF loop
+- **Archivos:** `public/index.html`, `public/styles/styles.css`, `public/libs/earth/1.0.0/earth.js`
+- Nuevos botones `[1x] [2x] [RETINA]` para resolución de grabación
+- `getSelectedScale()`: retorna 1, 2 o `devicePixelRatio`
+- Offscreen canvas se crea a `view.width × scale` x `view.height × scale`
+- SVGs se serializan a la resolución objetivo
+- Nuevo preset `[ULTRA]` (50 Mbps) al lado de LOW/MID/HIGH
+- Render loop cambiado de `setInterval` a `requestAnimationFrame` con throttle a target FPS
+
+---
+
+### Sesión 28: About Ventus + Preview eliminado
+
+#### 4bu. Reescritura de about.html
+- **Archivo:** `public/about.html`
+- Reemplazado contenido original de earth.nullschool.net por información de Ventus
+- Créditos a Cameron Beccario como autor original
+- Atribución a GFS/NOAA, Render.com, grib2json
+
+#### 4bv. Restaurar about modal + eliminar preview
+- **Archivo:** `public/index.html`, `public/libs/earth/1.0.0/earth.js`
+- Se restauró `<a id="show-about" href="#">about</a>` para que funcione el modal popup original
+- Se eliminaron `og:image` y `twitter:image` (preview deshabilitado)
+- Twitter card cambiada a `summary` (sin imagen)
+
+---
+
+### Menú actual (v0.077)
 
 ```
 ┌──────────────────────────────────────────────┐
-│ ● CONTROL v0.066                       ▌    │
+│ ● CONTROL v0.077                        ▌    │
 ├──────────────────────────────────────────────┤
 │ MODE    [AIR] [OCN]                          │
 │ PROJ    A AE CE E O S WB W3                  │
@@ -915,10 +984,11 @@ lsof -ti :8080 | xargs kill -9                # Matar servidor
 │ SCALE   [===========●===========] 1.0        │
 │ CAPTURE [SCRSHT]                             │
 │ RECORD  [REC]  00:10                         │
-│          [24][30][60][120] [LOW][MID][HIGH]  │
-│ ABOUT   [ABOUT]                              │
+│          [24][30][60][120] [LOW][MID][HIGH][ULTRA]
+│          [1x][2x][RETINA]                    │
+│ about                                        │
 │ ----------------------------------------     │
-│ ■ ONLINE — ▌                                 │
+│ ■ ONLINE 2026-06-09 18:00:00 UTC — ▌         │
 └──────────────────────────────────────────────┘
 ```
 
@@ -967,8 +1037,8 @@ curl -X POST https://api.render.com/v1/services/srv-d8k672v7f7vs73c00mv0/deploys
 
 | Archivo | Versión |
 |---------|---------|
-| `styles.css` | `v=11` |
-| `earth.js` | `v=13` |
+| `styles.css` | `v=12` |
+| `earth.js` | `v=16` |
 | `micro.js` | `v=2` |
 | `globes.js` | `v=3` |
 | `products.js` | `v=3` |
@@ -989,6 +1059,36 @@ El panel de control muestra la versión como `v0.xxx`, donde `xxx` es el número
 
 | Versión panel | Cambio # | Último cambio |
 |---|:---:|---|
-| v0.066 | 66 | 4bn — Preservación de partículas durante zoom |
+| v0.077 | 74 | 4by — Restaurar about modal + eliminar preview |
+
+---
+
+## 18. PRIORIDADES — PRÓXIMA SESIÓN
+
+Las siguientes mejoras fueron priorizadas para la próxima sesión de trabajo:
+
+### 🥇 #7 — WebSocket push
+- **Qué:** Cuando el cron de GFS complete una actualización, el servidor envía un evento SSE/WebSocket al frontend para que recargue los datos automáticamente
+- **Por qué:** Hoy el usuario debe recargar la página manualmente para ver datos nuevos
+- **Archivos involucrados:** `server.js`, `public/libs/earth/1.0.0/earth.js`
+- **Dependencias:** `ws` o `express-sse` (npm)
+
+### 🥇 #9 — Time-lapse server-side
+- **Qué:** Usar ffmpeg + múltiples forecast hours GFS para generar un video MP4 de la evolución del viento en X horas
+- **Por qué:** ffmpeg ya está instalado en Docker, solo falta pipeline
+- **Archivos involucrados:** `server.js`, `Dockerfile`, `scripts/update-gfs.sh`
+- **Dependencias:** ffmpeg (✅ ya instalado)
+
+### 🥇 #12 — Múltiples modelos meteorológicos
+- **Qué:** Además de GFS (NOAA), agregar otros modelos abiertos como ICON (Alemania), ERA5 (ECMWF)
+- **Por qué:** Comparar modelos, mayor precisión
+- **Archivos involucrados:** `scripts/update-gfs.sh`, `public/libs/earth/1.0.0/products.js`
+- **Nota:** Cada modelo tiene diferente resolución, formato y URL
+
+### 🥇 #14 — Mobile responsive
+- **Qué:** El panel de control ocupa mucho espacio en pantallas chicas. Hacerlo colapsable o más compacto
+- **Por qué:** Ventus no escala bien en celulares/tablets
+- **Archivos involucrados:** `public/styles/styles.css`, `public/index.html`, `public/libs/earth/1.0.0/earth.js`
+
 
 
