@@ -1235,6 +1235,7 @@
         );
 
         d3.select("#show-about").on("click", function() {
+            d3.event.preventDefault();
             // Hide the menu first
             d3.select("#menu").classed("invisible", true);
             // Show the about modal
