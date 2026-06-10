@@ -89,7 +89,7 @@ check_prereqs() {
 
 detect_hour() {
     local ymd="$1"
-    local prev_ymd=$(python3 -c "from datetime import datetime,timedelta; print((datetime.strptime('$ymd','%Y%m%d')-timedelta(1)).strftime('%Y%m%d'))" 2>/dev/null || echo "")
+    local prev_ymd=$(date -u -d "yesterday" +%Y%m%d 2>/dev/null || date -u -v-1d +%Y%m%d 2>/dev/null || echo "")
     local h=$(date -u +%H)
     h=$(( h / 6 * 6 ))
 
@@ -140,7 +140,7 @@ download_grib() {
 
     curl -f -s -S -o "$tmpfile" \
         --connect-timeout 30 \
-        --max-time 120 \
+        --max-time 180 \
         "$url" || {
         echo "❌ Error descargando datos GFS para ${ymd} ${hour}:00Z"
         return 1
@@ -213,7 +213,13 @@ header = data[0]['header'] if isinstance(data, list) else data.get('header', {})
 ref = header.get('refTime', 'N/A')
 print(f'📅 Fecha del dato: {ref}')
 print(f'📊 Registros: {len(data) if isinstance(data, list) else \"N/A\"}')
-" 2>/dev/null || echo "   (no se pudo leer fecha)"
+" 2>/dev/null || {
+        # Fallback: parse JSON with grep (python3 not available)
+        local reftime=$(grep -o '"refTime":"[^"]*"' "$dest" 2>/dev/null | head -1 | cut -d'"' -f4)
+        local records=$(grep -o '"header":' "$dest" 2>/dev/null | wc -l)
+        echo "📅 Fecha del dato: ${reftime:-N/A}"
+        echo "📊 Registros: ${records:-N/A}"
+    }
 }
 
 # ─── Main ────────────────────────────────────────────────────────────────────

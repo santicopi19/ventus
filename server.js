@@ -173,7 +173,7 @@ function runGfsUpdate() {
 
   const proc = exec(`bash "${UPDATE_SCRIPT}"`, {
     cwd: __dirname,
-    timeout: 300_000, // 5 minutes timeout
+    timeout: 600_000, // 10 minutes timeout
     env: {
       ...process.env,
       GRIB2JSON_HOME: process.env.GRIB2JSON_HOME || "/opt/grib2json",
