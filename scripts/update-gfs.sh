@@ -239,11 +239,13 @@ if [[ -n "$FORCE_HOUR" ]]; then
     echo "🕐 Hora forzada: ${HOUR}:00Z"
 else
     echo "🔍 Detectando última corrida GFS disponible..."
-    HOUR=$(detect_hour "$YYYYMMDD") || {
-        echo "❌ No se encontraron datos GFS disponibles para hoy (${YYYYMMDD})."
-        echo "   Probá con --hour para especificar una hora."
+    DETECTED=$(detect_hour "$YYYYMMDD") || {
+        echo "❌ No se encontraron datos GFS disponibles."
         exit 1
     }
+    # Parse YYYYMMDD:HOUR from detect_hour output
+    YYYYMMDD="${DETECTED%%:*}"
+    HOUR="${DETECTED##*:}"
     echo "✅ Corrida más reciente: ${YYYYMMDD} ${HOUR}:00Z"
 fi
 echo ""
