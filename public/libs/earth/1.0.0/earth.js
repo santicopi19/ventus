@@ -319,6 +319,8 @@
                 moveStart: function() {
                     coastline.datum(mesh.coastLo);
                     lakes.datum(mesh.lakesLo);
+                    // Stop animation without clearing canvas (black screen fix)
+                    animatorAgent.cancel();
                 },
                 move: function() {
                     doDraw_throttled();
@@ -328,7 +330,7 @@
                     lakes.datum(mesh.lakesHi);
                     d3.selectAll("path").attr("d", path);
                     rendererAgent.trigger("render");
-                    // Correct field after zoom ends
+                    // Restart animation with current field (D3 CSS transform + projection handle scale)
                     var globe = globeAgent.value();
                     var grids = gridAgent.value();
                     if (globe && grids) {
