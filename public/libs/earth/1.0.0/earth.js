@@ -44,6 +44,84 @@
     }
 
     /**
+     * Perlin-style spatial smoothing using smoothstep interpolation on a coarse grid.
+     * Instead of a Gaussian kernel, downsamples the canvas to a grid with the specified
+     * spacing, then upsamples using Perlin's C² smoothstep (6t⁵ - 15t⁴ + 10t³).
+     * This preserves structure better than Gaussian blur — the "value noise" approach.
+     */
+    var currentGridSpacing = 1;  // 1 = no smoothing
+
+    function perlinSmooth(ctx, w, h, spacing) {
+        if (spacing <= 1) return;
+        var imageData = ctx.getImageData(0, 0, w, h);
+        var data = imageData.data;
+
+        // Build coarse grid: average of pixels in each cell
+        var cols = Math.floor(w / spacing) + 2;
+        var rows = Math.floor(h / spacing) + 2;
+        var grid = new Float64Array(cols * rows * 4);
+        var count = new Uint32Array(cols * rows);
+
+        for (var py = 0; py < h; py++) {
+            for (var px = 0; px < w; px++) {
+                var gi = Math.floor(px / spacing);
+                var gj = Math.floor(py / spacing);
+                var idx = (gj * cols + gi) * 4;
+                var di = (py * w + px) * 4;
+                grid[idx]     += data[di];
+                grid[idx + 1] += data[di + 1];
+                grid[idx + 2] += data[di + 2];
+                grid[idx + 3] += data[di + 3];
+                count[gj * cols + gi]++;
+            }
+        }
+
+        // Average grid cell values
+        for (var i = 0; i < cols * rows; i++) {
+            var c = count[i] || 1;
+            grid[i * 4]     /= c;
+            grid[i * 4 + 1] /= c;
+            grid[i * 4 + 2] /= c;
+            grid[i * 4 + 3] /= c;
+        }
+
+        // Perlin's smoothstep: C² continuous, 6t⁵ - 15t⁴ + 10t³
+        function smoothstep(t) {
+            return t * t * t * (t * (t * 6 - 15) + 10);
+        }
+
+        // Bilinear interpolation with smoothstep on fractional position
+        for (var py = 0; py < h; py++) {
+            for (var px = 0; px < w; px++) {
+                var gx = px / spacing;
+                var gy = py / spacing;
+                var ix = Math.min(Math.floor(gx), cols - 2);
+                var iy = Math.min(Math.floor(gy), rows - 2);
+                var fx = smoothstep(gx - ix);
+                var fy = smoothstep(gy - iy);
+
+                var i00 = (iy * cols + ix) * 4;
+                var i10 = (iy * cols + ix + 1) * 4;
+                var i01 = ((iy + 1) * cols + ix) * 4;
+                var i11 = ((iy + 1) * cols + ix + 1) * 4;
+
+                var out = (py * w + px) * 4;
+                for (var ch = 0; ch < 4; ch++) {
+                    var v00 = grid[i00 + ch];
+                    var v10 = grid[i10 + ch];
+                    var v01 = grid[i01 + ch];
+                    var v11 = grid[i11 + ch];
+                    var top = v00 + fx * (v10 - v00);
+                    var bot = v01 + fx * (v11 - v01);
+                    data[out + ch] = Math.round(top + fy * (bot - top));
+                }
+            }
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+    }
+
+    /**
      * An object to display various types of messages to the user.
      */
     var report = function() {
@@ -626,6 +704,8 @@
             g.filter = "none";
         }
 
+        var smoothFrameSkip = 0;
+
         (function frame() {
             try {
                 if (cancel.requested) {
@@ -634,6 +714,14 @@
                 }
                 evolve();
                 draw();
+                // Perlin-style spatial smoothing on the animation canvas
+                if (currentGridSpacing > 1) {
+                    smoothFrameSkip++;
+                    if (smoothFrameSkip % 3 === 0) {  // Every 3rd frame for perf
+                        var animCanvas = d3.select("#animation").node();
+                        perlinSmooth(animCanvas.getContext("2d"), animCanvas.width, animCanvas.height, currentGridSpacing);
+                    }
+                }
                 setTimeout(frame, FRAME_RATE);
             }
             catch (e) {
@@ -1070,12 +1158,16 @@
             var contrast = d3.select("#contrast-slider").property("value");
             var blur = d3.select("#blur-slider").property("value");
             currentBlur = +blur;
+            // Perlin spatial smoothing: slider controls grid spacing
+            currentGridSpacing = Math.max(1, Math.round(+blur));
             displayEl.style("filter", "grayscale(1) brightness(" + brightness + "%) contrast(" + contrast + "%)");
-            var blurFilter = blur > 0 ? "blur(" + blur + "px)" : null;
-            d3.select("#map").style("filter", blurFilter);
-            d3.select("#animation").style("filter", blurFilter);
-            d3.select("#overlay").style("filter", blurFilter);
-            d3.select("#foreground").style("filter", blurFilter);
+            // Apply perlin smoothing to static canvases immediately
+            if (currentGridSpacing > 1) {
+                var overlayCanvas = d3.select("#overlay").node();
+                if (overlayCanvas) {
+                    perlinSmooth(overlayCanvas.getContext("2d"), overlayCanvas.width, overlayCanvas.height, currentGridSpacing);
+                }
+            }
             // Update numeric value displays
             d3.select("#brightness-value").text(brightness);
             d3.select("#contrast-value").text(contrast);
