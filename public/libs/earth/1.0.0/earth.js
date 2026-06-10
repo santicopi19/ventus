@@ -637,10 +637,9 @@
                     field.release();
                     return;
                 }
-
                 evolve();
                 draw();
-                requestAnimationFrame(frame);
+                setTimeout(frame, FRAME_RATE);
             }
             catch (e) {
                 report.error(e);
