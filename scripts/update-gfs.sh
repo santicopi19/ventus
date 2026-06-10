@@ -89,6 +89,7 @@ check_prereqs() {
 
 detect_hour() {
     local ymd="$1"
+    local prev_ymd=$(date -u -d "$ymd -1 day" +%Y%m%d 2>/dev/null || date -u -j -v-1d +%Y%m%d 2>/dev/null || echo "")
     local h=$(date -u +%H)
     h=$(( h / 6 * 6 ))
 
@@ -99,13 +100,18 @@ detect_hour() {
         var_params="lev_10_m_above_ground=on&var_UGRD=on&var_VGRD=on"
     fi
 
-    for hour in $(printf "%02d\n%02d\n%02d\n%02d\n%02d" "$h" 18 12 06 00 | sort -rn | uniq); do
-        local url="https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p50.pl?file=gfs.t${hour}z.pgrb2full.0p50.f000&${var_params}&dir=%2Fgfs.${ymd}%2F${hour}%2Fatmos"
-        local status=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 "$url" 2>/dev/null || echo "000")
-        if [[ "$status" == "200" ]]; then
-            printf "%s" "$hour"
-            return 0
-        fi
+    # Try current day first, then previous day
+    for ymd_try in "$ymd" "$prev_ymd"; do
+        [[ -z "$ymd_try" ]] && continue
+        for hour in $(printf "%02d\n%02d\n%02d\n%02d\n%02d" "$h" 18 12 06 00 | sort -rn | uniq); do
+            local url="https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p50.pl?file=gfs.t${hour}z.pgrb2full.0p50.f000&${var_params}&dir=%2Fgfs.${ymd_try}%2F${hour}%2Fatmos"
+            local status=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 "$url" 2>/dev/null || echo "000")
+            if [[ "$status" == "200" ]]; then
+                YYYYMMDD="$ymd_try"
+                printf "%s" "$hour"
+                return 0
+            fi
+        done
     done
     return 1
 }
